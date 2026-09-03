@@ -4,16 +4,6 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, se
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 
-const TEAM_MEMBERS = [
-  { name: 'Matt Kirschner', email: 'matt@talentresources.com' },
-  { name: 'Zach Scheiner', email: 'Zach@talentresources.com' },
-  { name: 'Matt Waters', email: 'Matt.Waters@talentresources.com' },
-  { name: 'Nick Cotto', email: 'Nick.Cotto@talentresources.com' },
-  { name: 'Jessie Bruce', email: 'Jessie.Bruce@talentresources.com' },
-  { name: 'Noah Spiegel', email: 'Noah.Spiegel@talentresources.com' },
-  { name: 'Bonnie Taylor', email: 'Bonnie.Taylor@talentresources.com' }
-]
-
 const ADMIN_EMAIL = 'matt@talentresources.com'
 
 const DEAL_STATUSES = [
