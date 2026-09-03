@@ -3231,7 +3231,7 @@ function UsagePage({ isAdmin }) {
               ) : (
                 users.map(u => (
                   <tr key={u.id}>
-                    <td><strong>{u.email.split('@')[0]}</strong></td>
+                    <td><strong>{u.name || u.email.split('@')[0]}</strong></td>
                     <td>{u.email}</td>
                     <td>{u.createdAt ? new Date(u.createdAt.toDate?.() || u.createdAt).toLocaleDateString() : '-'}</td>
                     <td>{u.lastLogin ? new Date(u.lastLogin.toDate?.() || u.lastLogin).toLocaleDateString() : 'Never'}</td>
