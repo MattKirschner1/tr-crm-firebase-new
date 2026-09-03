@@ -70,7 +70,9 @@ function App() {
         try {
           const usersQuery = query(collection(db, 'users'), where('uid', '==', currentUser.uid))
           const snapshot = await getDocs(usersQuery)
+
           if (snapshot.docs.length > 0) {
+            // User exists, update last login
             const userDoc = snapshot.docs[0]
             const userData = userDoc.data()
             setUserProfile(userData)
@@ -83,9 +85,23 @@ function App() {
             await updateDoc(doc(db, 'users', userDoc.id), {
               lastLogin: new Date()
             })
+          } else {
+            // User doesn't exist, create their document
+            console.log('[Auth] Creating new user document for', currentUser.email)
+            const newUserDoc = await addDoc(collection(db, 'users'), {
+              email: currentUser.email,
+              uid: currentUser.uid,
+              createdAt: new Date(),
+              status: 'active',
+              name: currentUser.displayName || '',
+              lastLogin: new Date()
+            })
+            console.log('[Auth] User document created:', newUserDoc.id)
+            setUserProfile({ email: currentUser.email, uid: currentUser.uid, name: currentUser.displayName || '' })
+            setShowProfileModal(true) // Show profile modal to fill in name
           }
         } catch (error) {
-          console.error('Error updating last login:', error)
+          console.error('Error with user document:', error)
         }
       }
       setLoading(false)
@@ -1309,9 +1325,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
           email: d.data().email,
           name: d.data().name || d.data().email.split('@')[0]
         }))
+        console.log('[NewDeal] Team users loaded:', users)
         setTeamUsers(users)
       } catch (error) {
-        console.error('Error loading team users:', error)
+        console.error('[NewDeal] Error loading team users:', error)
       }
     }
     if (user) loadTeamUsers()
@@ -3858,8 +3875,9 @@ function PRClientsPage({ prClients, setPrClients, user }) {
   })
   const contractFileInputRef = React.useRef(null)
 
+  // Load team users once on mount
   useEffect(() => {
-    const loadTeamUsers = async () => {
+    const loadUsers = async () => {
       try {
         const snapshot = await getDocs(collection(db, 'users'))
         const users = snapshot.docs.map(d => ({
@@ -3872,7 +3890,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
         console.error('Error loading team users:', error)
       }
     }
-    loadTeamUsers()
+    loadUsers()
   }, [])
 
   const filteredClients = prClients.filter(client =>
