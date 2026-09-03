@@ -59,7 +59,7 @@ function App() {
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [prClients, setPrClients] = useState([])
-  const [teamMembers, setTeamMembers] = useState([])
+  
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
@@ -69,7 +69,7 @@ function App() {
       setUser(currentUser)
       if (currentUser) {
         loadDeals()
-        loadTeamMembers()
+        
         const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
@@ -132,14 +132,6 @@ function App() {
     }
   }
 
-  const loadTeamMembers = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'users'))
-      const members = snapshot.docs
-        .map(d => ({
-          name: d.data().email.split('@')[0].charAt(0).toUpperCase() + d.data().email.split('@')[0].slice(1),
-          email: d.data().email
-        }))
         .sort((a, b) => a.email.localeCompare(b.email))
       setTeamMembers(members)
     } catch (error) {
@@ -343,7 +335,7 @@ function App() {
 
       <main className="main-content">
         {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} />}
-        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} teamMembers={teamMembers} />}
+        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
         {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
@@ -1182,7 +1174,7 @@ function Dashboard({ deals, contacts, isAdmin }) {
   )
 }
 
-function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile, teamMembers }) {
+function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -1660,10 +1652,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                 <div className="form-group">
                   <label>Deal Owner</label>
                   <select value={formData.dealOwnerEmail} onChange={(e) => {
-                    const selectedMember = teamMembers.find(m => m.email === e.target.value)
+                    const selectedMember = TEAM_MEMBERS.find(m => m.email === e.target.value)
                     setFormData({ ...formData, dealOwnerEmail: e.target.value, dealOwnerName: selectedMember?.name || '' })
                   }} required>
-                    {teamMembers.map(member => (
+                    {TEAM_MEMBERS.map(member => (
                       <option key={member.email} value={member.email}>{member.name}</option>
                     ))}
                   </select>
