@@ -3514,6 +3514,8 @@ function PRClientsPage({ prClients, setPrClients, user }) {
     clientContactEmail: '',
     clientContactPhone: '',
     accountOwners: [{ name: '', email: '' }],
+    contractStartDate: '',
+    contractEndDate: '',
     contracts: []
   })
   const contractFileInputRef = React.useRef(null)
@@ -3553,6 +3555,8 @@ function PRClientsPage({ prClients, setPrClients, user }) {
         clientContactEmail: '',
         clientContactPhone: '',
         accountOwners: [{ name: '', email: '' }],
+        contractStartDate: '',
+        contractEndDate: '',
         contracts: []
       })
       setEditingId(null)
@@ -3623,6 +3627,8 @@ function PRClientsPage({ prClients, setPrClients, user }) {
               clientContactEmail: '',
               clientContactPhone: '',
               accountOwners: [{ name: '', email: '' }],
+              contractStartDate: '',
+              contractEndDate: '',
               contracts: []
             })
           }}
@@ -3771,6 +3777,28 @@ function PRClientsPage({ prClients, setPrClients, user }) {
 
           <div style={{ marginBottom: '16px', borderTop: '1px solid var(--gray-300)', paddingTop: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Contracts</label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>Contract Start Date</label>
+                <input
+                  type="date"
+                  value={formData.contractStartDate}
+                  onChange={(e) => setFormData({ ...formData, contractStartDate: e.target.value })}
+                  style={{ width: '100%', padding: '6px', border: '1px solid var(--gray-300)', borderRadius: '3px', fontSize: '12px' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', marginBottom: '4px' }}>Contract End Date</label>
+                <input
+                  type="date"
+                  value={formData.contractEndDate}
+                  onChange={(e) => setFormData({ ...formData, contractEndDate: e.target.value })}
+                  style={{ width: '100%', padding: '6px', border: '1px solid var(--gray-300)', borderRadius: '3px', fontSize: '12px' }}
+                />
+              </div>
+            </div>
+
             <input
               ref={contractFileInputRef}
               type="file"
@@ -4007,6 +4035,34 @@ function PRContractAlertsPage({ prClients }) {
 
     const alerts = []
     prClients.forEach(client => {
+      // Check contract term dates first
+      if (client.contractEndDate) {
+        const endDate = new Date(client.contractEndDate)
+        const daysUntilExpiration = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
+
+        if (daysUntilExpiration <= 15 && daysUntilExpiration > 0) {
+          alerts.push({
+            clientName: client.clientName,
+            contractName: 'Contract Term',
+            endDate: client.contractEndDate,
+            daysUntilExpiration,
+            accountOwners: client.accountOwners || [],
+            monthlyFee: client.monthlyFee
+          })
+        } else if (daysUntilExpiration <= 0) {
+          alerts.push({
+            clientName: client.clientName,
+            contractName: 'Contract Term',
+            endDate: client.contractEndDate,
+            daysUntilExpiration,
+            accountOwners: client.accountOwners || [],
+            monthlyFee: client.monthlyFee,
+            isExpired: true
+          })
+        }
+      }
+
+      // Also check individual contract files
       if (client.contracts && Array.isArray(client.contracts)) {
         client.contracts.forEach(contract => {
           if (contract.endDate) {
