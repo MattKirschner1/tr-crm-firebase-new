@@ -1689,16 +1689,26 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   }
 
   const filteredDeals = deals.filter(d => {
-    const ownerMatch = filterOwner === 'all' || (d.dealOwnerName || 'Unassigned') === filterOwner
+    const ownerMatch = filterOwner === 'all' || (d.dealOwnerEmail || 'unassigned') === filterOwner
     const searchMatch = !search ||
       d.brand.toLowerCase().includes(search.toLowerCase()) ||
       d.talent.toLowerCase().includes(search.toLowerCase())
     return ownerMatch && searchMatch
   })
 
+  const getOwnerName = (email) => {
+    if (email === 'unassigned') return 'Unassigned'
+    const user = teamUsers.find(u => u.email === email)
+    return user?.name || email.split('@')[0]
+  }
+
   const getUniqueOwners = () => {
-    const owners = new Set(deals.map(d => d.dealOwnerName || 'Unassigned'))
-    return Array.from(owners).sort()
+    const owners = new Set(deals.map(d => d.dealOwnerEmail || 'unassigned'))
+    return Array.from(owners).sort((a, b) => {
+      const nameA = getOwnerName(a)
+      const nameB = getOwnerName(b)
+      return nameA.localeCompare(nameB)
+    })
   }
 
   const netProfit = (deal) => {
@@ -1713,11 +1723,11 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
 
   const groupedDeals = {}
   filteredDeals.forEach(deal => {
-    const owner = deal.dealOwnerName || 'Unassigned'
-    if (!groupedDeals[owner]) {
-      groupedDeals[owner] = []
+    const ownerEmail = deal.dealOwnerEmail || 'unassigned'
+    if (!groupedDeals[ownerEmail]) {
+      groupedDeals[ownerEmail] = []
     }
-    groupedDeals[owner].push(deal)
+    groupedDeals[ownerEmail].push(deal)
   })
 
   const toggleDealExpand = (dealId) => {
@@ -1741,6 +1751,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
         isAdmin={isAdmin}
         getContactName={getContactName}
         netProfit={netProfit}
+        teamUsers={teamUsers}
       />
     )
   }
@@ -1755,6 +1766,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
         isAdmin={isAdmin}
         getContactName={getContactName}
         netProfit={netProfit}
+        teamUsers={teamUsers}
       />
     )
   }
@@ -1769,6 +1781,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
         isAdmin={isAdmin}
         getContactName={getContactName}
         netProfit={netProfit}
+        teamUsers={teamUsers}
       />
     )
   }
@@ -1792,8 +1805,8 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
         />
         <select value={filterOwner} onChange={(e) => setFilterOwner(e.target.value)} style={{ padding: '10px 12px', border: '1px solid var(--gray-300)', borderRadius: '6px', fontSize: '14px' }}>
           <option value="all">All Owners</option>
-          {getUniqueOwners().map(owner => (
-            <option key={owner} value={owner}>{owner}</option>
+          {getUniqueOwners().map(ownerEmail => (
+            <option key={ownerEmail} value={ownerEmail}>{getOwnerName(ownerEmail)}</option>
           ))}
         </select>
         {selected.size > 0 && (
@@ -2542,7 +2555,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                           <div>
                             <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Owner</p>
-                            <p style={{ margin: '0', fontSize: '12px' }}>{deal.dealOwnerName}</p>
+                            <p style={{ margin: '0', fontSize: '12px' }}>{getOwnerName(deal.dealOwnerEmail || 'unassigned')}</p>
                           </div>
                           <div>
                             <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Contact</p>
@@ -3304,10 +3317,16 @@ function UsagePage({ isAdmin }) {
   )
 }
 
-function TalentProfileView({ talentName, deals, contacts, onBack, isAdmin, getContactName, netProfit }) {
+function TalentProfileView({ talentName, deals, contacts, onBack, isAdmin, getContactName, netProfit, teamUsers }) {
   const talentDeals = deals.filter(d => d.talent === talentName)
   const relatedBrands = Array.from(new Set(talentDeals.map(d => d.brand).filter(Boolean)))
   const [expandedDeals, setExpandedDeals] = React.useState(new Set())
+
+  const getOwnerName = (email) => {
+    if (!email || email === 'unassigned') return 'Unassigned'
+    const user = teamUsers.find(u => u.email === email)
+    return user?.name || email.split('@')[0]
+  }
 
   const toggleDealExpand = (dealId) => {
     const newExpanded = new Set(expandedDeals)
@@ -3393,7 +3412,7 @@ function TalentProfileView({ talentName, deals, contacts, onBack, isAdmin, getCo
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Owner</p>
-                      <p style={{ margin: '0', fontSize: '12px' }}>{deal.dealOwnerName}</p>
+                      <p style={{ margin: '0', fontSize: '12px' }}>{getOwnerName(deal.dealOwnerEmail)}</p>
                     </div>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Date</p>
@@ -3428,7 +3447,12 @@ function TalentProfileView({ talentName, deals, contacts, onBack, isAdmin, getCo
   )
 }
 
-function BrandProfileView({ brandName, deals, contacts, onBack, isAdmin, getContactName, netProfit }) {
+function BrandProfileView({ brandName, deals, contacts, onBack, isAdmin, getContactName, netProfit, teamUsers }) {
+  const getOwnerName = (email) => {
+    if (!email || email === 'unassigned') return 'Unassigned'
+    const user = teamUsers.find(u => u.email === email)
+    return user?.name || email.split('@')[0]
+  }
   const brandDeals = deals.filter(d => d.brand === brandName)
   const relatedTalents = Array.from(new Set(brandDeals.map(d => d.talent).filter(Boolean)))
   const [expandedDeals, setExpandedDeals] = React.useState(new Set())
@@ -3517,7 +3541,7 @@ function BrandProfileView({ brandName, deals, contacts, onBack, isAdmin, getCont
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Owner</p>
-                      <p style={{ margin: '0', fontSize: '12px' }}>{deal.dealOwnerName}</p>
+                      <p style={{ margin: '0', fontSize: '12px' }}>{getOwnerName(deal.dealOwnerEmail)}</p>
                     </div>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Date</p>
@@ -3552,7 +3576,12 @@ function BrandProfileView({ brandName, deals, contacts, onBack, isAdmin, getCont
   )
 }
 
-function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getContactName, netProfit }) {
+function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getContactName, netProfit, teamUsers }) {
+  const getOwnerName = (email) => {
+    if (!email || email === 'unassigned') return 'Unassigned'
+    const user = teamUsers.find(u => u.email === email)
+    return user?.name || email.split('@')[0]
+  }
   const agencyDeals = deals.filter(d => d.agency === agencyName)
   const relatedBrands = Array.from(new Set(agencyDeals.map(d => d.brand).filter(Boolean)))
   const relatedTalents = Array.from(new Set(agencyDeals.map(d => d.talent).filter(Boolean)))
@@ -3657,7 +3686,7 @@ function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getCo
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Owner</p>
-                      <p style={{ margin: '0', fontSize: '12px' }}>{deal.dealOwnerName}</p>
+                      <p style={{ margin: '0', fontSize: '12px' }}>{getOwnerName(deal.dealOwnerEmail)}</p>
                     </div>
                     <div>
                       <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Date</p>
