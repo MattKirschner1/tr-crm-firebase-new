@@ -2867,6 +2867,8 @@ function ContactsPage({ contacts, user, onReload, isAdmin, exportContactsAsCSV }
 function UsersPage({ isAdmin, onUserRemoved }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [editingUser, setEditingUser] = useState(null)
+  const [editName, setEditName] = useState('')
 
   useEffect(() => {
     if (isAdmin) {
@@ -2938,6 +2940,26 @@ function UsersPage({ isAdmin, onUserRemoved }) {
     }
   }
 
+  const handleEditName = (user) => {
+    setEditingUser(user)
+    setEditName(user.name || '')
+  }
+
+  const handleSaveName = async () => {
+    if (!editName.trim()) {
+      alert('Name cannot be empty')
+      return
+    }
+    try {
+      await updateDoc(doc(db, 'users', editingUser.id), { name: editName })
+      setEditingUser(null)
+      setEditName('')
+      loadUsers()
+    } catch (error) {
+      alert('Error updating name: ' + error.message)
+    }
+  }
+
   if (!isAdmin) {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Access denied</div>
   }
@@ -2955,6 +2977,7 @@ function UsersPage({ isAdmin, onUserRemoved }) {
           <table className="table">
             <thead>
               <tr>
+                <th>Name</th>
                 <th>Email</th>
                 <th>Signed Up</th>
                 <th>Status</th>
@@ -2964,7 +2987,8 @@ function UsersPage({ isAdmin, onUserRemoved }) {
             <tbody>
               {users.map(u => (
                 <tr key={u.id}>
-                  <td><strong>{u.email}</strong></td>
+                  <td><strong>{u.name || '(no name)'}</strong></td>
+                  <td>{u.email}</td>
                   <td>{u.createdAt ? new Date(u.createdAt.seconds ? u.createdAt.seconds * 1000 : u.createdAt).toLocaleDateString() : '-'}</td>
                   <td>
                     <span style={{
@@ -2979,6 +3003,13 @@ function UsersPage({ isAdmin, onUserRemoved }) {
                     </span>
                   </td>
                   <td style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-small"
+                      onClick={() => handleEditName(u)}
+                      style={{ backgroundColor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' }}
+                    >
+                      Edit
+                    </button>
                     <button
                       className="btn btn-small"
                       onClick={() => handleToggleStatus(u.id, u.status)}
@@ -3003,6 +3034,63 @@ function UsersPage({ isAdmin, onUserRemoved }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {editingUser && (
+        <div className="modal-overlay" onClick={() => setEditingUser(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 20px 0' }}>Edit Team Member Name</h2>
+            <div className="form-group" style={{ marginBottom: '24px' }}>
+              <label>Email</label>
+              <input
+                type="email"
+                value={editingUser.email}
+                disabled
+                style={{
+                  padding: '10px 12px',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: 'var(--gray-100)',
+                  color: 'var(--gray-600)',
+                  cursor: 'not-allowed'
+                }}
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: '24px' }}>
+              <label>Full Name</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter full name"
+                style={{
+                  padding: '10px 12px',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setEditingUser(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveName}
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
