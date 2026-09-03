@@ -3336,7 +3336,17 @@ function FileSearchPage({ deals, downloadFile }) {
         />
       </div>
 
-      {totalFiles === 0 ? (
+      {!fileSearch ? (
+        <div style={{
+          border: '1px solid var(--gray-300)',
+          borderRadius: '6px',
+          padding: '32px',
+          textAlign: 'center',
+          color: 'var(--gray-600)'
+        }}>
+          <p style={{ fontSize: '14px', margin: '0' }}>Start typing to search for files</p>
+        </div>
+      ) : totalFiles === 0 ? (
         <p style={{ color: 'var(--gray-600)', textAlign: 'center', padding: '32px' }}>
           No files attached to any deals
         </p>
@@ -3348,7 +3358,7 @@ function FileSearchPage({ deals, downloadFile }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
           {filteredDeals.map(([dealId, dealData]) => {
             const visibleFiles = getVisibleFiles(dealData)
-            const isExpanded = expandedDeals[dealId] ?? false // Collapsed by default for privacy
+            const isExpanded = expandedDeals[dealId] ?? true // Expanded when search results show
 
             return (
               <div key={dealId} style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -3366,20 +3376,12 @@ function FileSearchPage({ deals, downloadFile }) {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    {isExpanded ? (
-                      <>
-                        <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>
-                          ▼ {dealData.dealName}
-                        </p>
-                        <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
-                          Talent: {dealData.talent} | Status: {dealData.dealStatus} | {visibleFiles.length} file(s)
-                        </p>
-                      </>
-                    ) : (
-                      <p style={{ margin: '0', fontWeight: '600', fontSize: '14px' }}>
-                        ▶ Deal with {visibleFiles.length} file(s)
-                      </p>
-                    )}
+                    <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>
+                      {isExpanded ? '▼' : '▶'} {dealData.dealName}
+                    </p>
+                    <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                      Talent: {dealData.talent} | Status: {dealData.dealStatus} | {visibleFiles.length} file(s)
+                    </p>
                   </div>
                 </div>
 
