@@ -351,7 +351,9 @@ function App() {
       </nav>
 
       <main className="main-content">
-        {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} />}
+        {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} onEditDeal={(deal) => {
+          setCurrentPage('deals')
+        }} />}
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
@@ -1047,10 +1049,12 @@ function LoginPage({ onLogin }) {
   )
 }
 
-function Dashboard({ deals, contacts, isAdmin }) {
+function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const [dateFilter, setDateFilter] = useState('all')
   const [viewType, setViewType] = useState('company')
   const [expandedOwners, setExpandedOwners] = useState(new Set())
+  const [editingDeal, setEditingDeal] = useState(null)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const filteredDeals = deals.filter(deal => {
     if (dateFilter === 'all') return true
@@ -1182,7 +1186,10 @@ function Dashboard({ deals, contacts, isAdmin }) {
                         )}
                       </tr>
                       {isExpanded && ownerDeals.map(deal => (
-                        <tr key={deal.id} style={{ backgroundColor: 'var(--gray-50)' }}>
+                        <tr key={deal.id} style={{ backgroundColor: 'var(--gray-50)', cursor: 'pointer' }} onClick={() => {
+                          setEditingDeal(deal)
+                          setShowEditModal(true)
+                        }}>
                           <td></td>
                           <td colSpan={isAdmin ? 4 : 2}>
                             <div style={{ paddingLeft: '20px', fontSize: '14px' }}>
@@ -1202,6 +1209,64 @@ function Dashboard({ deals, contacts, isAdmin }) {
           </table>
         </div>
       </div>
+
+      {showEditModal && editingDeal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <h2>Deal Details</h2>
+            <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+              <div style={{ marginBottom: '12px' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Brand</p>
+                <p style={{ margin: '0', fontSize: '14px' }}>{editingDeal.brand}</p>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Talent</p>
+                <p style={{ margin: '0', fontSize: '14px' }}>{editingDeal.talent}</p>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Status</p>
+                <p style={{ margin: '0', fontSize: '14px' }}>{editingDeal.status}</p>
+              </div>
+              <div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Deal Date</p>
+                <p style={{ margin: '0', fontSize: '14px' }}>{new Date(editingDeal.dealDate).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowEditModal(false)}
+                style={{ padding: '8px 16px', backgroundColor: 'var(--gray-300)', color: 'black', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  onEditDeal(editingDeal)
+                }}
+                style={{ padding: '8px 16px', backgroundColor: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}
+              >
+                Edit Full Details
+              </button>
+              <button
+                onClick={async () => {
+                  if (window.confirm('Delete this deal?')) {
+                    try {
+                      await deleteDoc(doc(db, 'deals', editingDeal.id))
+                      setShowEditModal(false)
+                    } catch (error) {
+                      console.error('Error deleting deal:', error)
+                    }
+                  }
+                }}
+                style={{ padding: '8px 16px', backgroundColor: '#f87171', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
