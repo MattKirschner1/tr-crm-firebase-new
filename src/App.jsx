@@ -368,7 +368,7 @@ function App() {
       </nav>
 
       <main className="main-content">
-        {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} teamUsers={teamUsers} onEditDeal={(deal) => {
+        {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} onEditDeal={(deal) => {
           setCurrentPage('deals')
         }} />}
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
@@ -1066,7 +1066,7 @@ function LoginPage({ onLogin }) {
   )
 }
 
-function Dashboard({ deals, contacts, isAdmin, onEditDeal, teamUsers = [] }) {
+function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const [dateFilter, setDateFilter] = useState('all')
   const [viewType, setViewType] = useState('company')
   const [expandedOwners, setExpandedOwners] = useState(new Set())
@@ -1086,19 +1086,15 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal, teamUsers = [] }) {
   }
 
   const ownerMetrics = {}
-  const teamMemberNames = teamUsers.map(u => u.name)
   filteredDeals.forEach(deal => {
     const owner = deal.dealOwnerName || 'Unassigned'
-    // Only include current team members
-    if (owner === 'Unassigned' || teamMemberNames.includes(owner)) {
-      if (!ownerMetrics[owner]) {
-        ownerMetrics[owner] = { deals: 0, revenue: 0, profit: 0 }
-      }
-      ownerMetrics[owner].deals += 1
-      if (isAdmin) {
-        ownerMetrics[owner].revenue += (deal.feeCharged || 0)
-        ownerMetrics[owner].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
-      }
+    if (!ownerMetrics[owner]) {
+      ownerMetrics[owner] = { deals: 0, revenue: 0, profit: 0 }
+    }
+    ownerMetrics[owner].deals += 1
+    if (isAdmin) {
+      ownerMetrics[owner].revenue += (deal.feeCharged || 0)
+      ownerMetrics[owner].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
     }
   })
 
