@@ -1072,6 +1072,20 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const [expandedOwners, setExpandedOwners] = useState(new Set())
   const [editingDeal, setEditingDeal] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [teamUsers, setTeamUsers] = useState([])
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const usersSnapshot = await getDocs(collection(db, 'users'))
+        const users = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+        setTeamUsers(users)
+      } catch (error) {
+        console.error('Error loading users:', error)
+      }
+    }
+    loadUsers()
+  }, [])
 
   const filteredDeals = deals.filter(deal => {
     if (dateFilter === 'all') return true
