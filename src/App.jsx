@@ -49,7 +49,6 @@ function App() {
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [prClients, setPrClients] = useState([])
-  const [teamUsers, setTeamUsers] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -66,7 +65,6 @@ function App() {
         const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
-        loadTeamUsers()
 
         // Track last login and check profile completion
         try {
@@ -131,20 +129,6 @@ function App() {
       setPrClients(clients)
     } catch (error) {
       console.error('Error loading PR clients:', error)
-    }
-  }
-
-  const loadTeamUsers = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'users'))
-      const users = snapshot.docs.map(d => ({
-        id: d.id,
-        email: d.data().email,
-        name: d.data().name || d.data().email.split('@')[0]
-      }))
-      setTeamUsers(users)
-    } catch (error) {
-      console.error('Error loading team users:', error)
     }
   }
 
