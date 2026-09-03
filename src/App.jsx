@@ -3776,6 +3776,9 @@ function PRClientsPage({ prClients, setPrClients, user }) {
   const [showForm, setShowForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [teamUsers, setTeamUsers] = useState([])
+  const [ownerSearches, setOwnerSearches] = useState({})
+  const [showOwnerSuggestions, setShowOwnerSuggestions] = useState({})
   const [formData, setFormData] = useState({
     clientName: '',
     monthlyFee: '',
@@ -3788,6 +3791,23 @@ function PRClientsPage({ prClients, setPrClients, user }) {
     contracts: []
   })
   const contractFileInputRef = React.useRef(null)
+
+  useEffect(() => {
+    const loadTeamUsers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'users'))
+        const users = snapshot.docs.map(d => ({
+          id: d.id,
+          email: d.data().email,
+          name: d.data().name || d.data().email.split('@')[0]
+        }))
+        setTeamUsers(users)
+      } catch (error) {
+        console.error('Error loading team users:', error)
+      }
+    }
+    loadTeamUsers()
+  }, [])
 
   const filteredClients = prClients.filter(client =>
     client.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -3980,50 +4000,96 @@ function PRClientsPage({ prClients, setPrClients, user }) {
 
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Account Owners</label>
-            {formData.accountOwners.map((owner, idx) => (
-              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', marginBottom: '8px' }}>
-                <input
-                  type="text"
-                  value={owner.name}
-                  onChange={(e) => {
-                    const newOwners = [...formData.accountOwners]
-                    newOwners[idx].name = e.target.value
-                    setFormData({ ...formData, accountOwners: newOwners })
-                  }}
-                  placeholder="Owner name"
-                  style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
-                />
-                <input
-                  type="email"
-                  value={owner.email}
-                  onChange={(e) => {
-                    const newOwners = [...formData.accountOwners]
-                    newOwners[idx].email = e.target.value
-                    setFormData({ ...formData, accountOwners: newOwners })
-                  }}
-                  placeholder="Owner email"
-                  style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
-                />
-                <button
-                  onClick={() => {
-                    setFormData({
-                      ...formData,
-                      accountOwners: formData.accountOwners.filter((_, i) => i !== idx)
-                    })
-                  }}
-                  style={{
-                    background: '#ff6b6b',
-                    color: 'white',
-                    border: 'none',
-                    padding: '8px 12px',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+            {formData.accountOwners.map((owner, idx) => {
+              const searchValue = ownerSearches[idx] || ''
+              const ownerSuggestions = searchValue.trim() ? teamUsers.filter(u =>
+                u.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+                u.email.toLowerCase().includes(searchValue.toLowerCase())
+              ) : []
+
+              return (
+                <div key={idx} style={{ marginBottom: '8px', position: 'relative' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px' }}>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        value={searchValue}
+                        onChange={(e) => {
+                          setOwnerSearches({ ...ownerSearches, [idx]: e.target.value })
+                          setShowOwnerSuggestions({ ...showOwnerSuggestions, [idx]: true })
+                        }}
+                        onFocus={() => setShowOwnerSuggestions({ ...showOwnerSuggestions, [idx]: true })}
+                        placeholder="Search team member..."
+                        style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                      />
+                      {showOwnerSuggestions[idx] && ownerSuggestions.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          backgroundColor: 'white',
+                          border: '1px solid var(--gray-300)',
+                          borderTop: 'none',
+                          borderRadius: '0 0 4px 4px',
+                          maxHeight: '150px',
+                          overflowY: 'auto',
+                          zIndex: 10
+                        }}>
+                          {ownerSuggestions.map(suggestion => (
+                            <div
+                              key={suggestion.id}
+                              onClick={() => {
+                                const newOwners = [...formData.accountOwners]
+                                newOwners[idx] = { name: suggestion.name, email: suggestion.email }
+                                setFormData({ ...formData, accountOwners: newOwners })
+                                setOwnerSearches({ ...ownerSearches, [idx]: '' })
+                                setShowOwnerSuggestions({ ...showOwnerSuggestions, [idx]: false })
+                              }}
+                              style={{
+                                padding: '8px',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid var(--gray-100)',
+                                backgroundColor: 'white',
+                                fontSize: '12px'
+                              }}
+                            >
+                              <strong>{suggestion.name}</strong> ({suggestion.email})
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          accountOwners: formData.accountOwners.filter((_, i) => i !== idx)
+                        })
+                        const newSearches = { ...ownerSearches }
+                        delete newSearches[idx]
+                        setOwnerSearches(newSearches)
+                      }}
+                      style={{
+                        background: '#ff6b6b',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {owner.name && owner.email && (
+                    <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                      Selected: {owner.name} ({owner.email})
+                    </p>
+                  )}
+                </div>
+              )
+            })}
             <button
               onClick={() => {
                 setFormData({
