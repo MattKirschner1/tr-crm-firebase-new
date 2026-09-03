@@ -1345,7 +1345,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       sagFee: deal.sagFee || false,
       brandReps: deal.brandReps || [],
       brandRepIds: deal.brandRepIds || [],
-      repForTalent: deal.repForTalent || [],
+      repForTalent: deal.repForTalent || '',
       repForTalentIds: deal.repForTalentIds || [],
       services: deal.services || [],
       serviceDetails: deal.serviceDetails || {
@@ -1367,7 +1367,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     setContactSearch(contactName)
     const repTalentName = deal.repForTalentId ? contacts.find(c => c.id === deal.repForTalentId)?.name || deal.repForTalent || '' : deal.repForTalent || ''
     setRepTalentSearch(repTalentName)
-    if (deal.services && deal.services.length > 0) {
+    if (Array.isArray(deal.services) && deal.services.length > 0) {
       const expanded = {}
       deal.services.forEach(s => {
         expanded[s] = false
