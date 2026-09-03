@@ -132,13 +132,6 @@ function App() {
     }
   }
 
-        .sort((a, b) => a.email.localeCompare(b.email))
-      setTeamMembers(members)
-    } catch (error) {
-      console.error('Error loading team members:', error)
-    }
-  }
-
   const downloadFile = (file) => {
     if (!file.dataUrl) return
     const link = document.createElement('a')
