@@ -3272,27 +3272,55 @@ function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getCo
 
 function FileSearchPage({ deals, downloadFile }) {
   const [fileSearch, setFileSearch] = useState('')
+  const [expandedDeals, setExpandedDeals] = useState({})
 
-  const allFiles = []
+  // Group files by deal
+  const dealFilesMap = {}
   deals.forEach(deal => {
     if (deal.fileAttachments && deal.fileAttachments.length > 0) {
-      deal.fileAttachments.forEach(file => {
-        allFiles.push({
+      const dealKey = deal.id
+      dealFilesMap[dealKey] = {
+        dealName: deal.brand || 'Unknown Brand',
+        talent: deal.talent || 'Unknown Talent',
+        dealStatus: deal.status || 'Unknown',
+        files: deal.fileAttachments.map(file => ({
           ...file,
-          dealId: deal.id,
-          dealName: deal.brand || 'Unknown Brand',
-          talent: deal.talent || 'Unknown Talent',
-          dealStatus: deal.status || 'Unknown'
-        })
-      })
+          dealId: deal.id
+        }))
+      }
     }
   })
 
-  const filteredFiles = allFiles.filter(file =>
-    file.name.toLowerCase().includes(fileSearch.toLowerCase()) ||
-    file.dealName.toLowerCase().includes(fileSearch.toLowerCase()) ||
-    file.talent.toLowerCase().includes(fileSearch.toLowerCase())
-  )
+  // Filter deals and files based on search
+  const filteredDeals = Object.entries(dealFilesMap).filter(([dealId, dealData]) => {
+    const dealMatches =
+      dealData.dealName.toLowerCase().includes(fileSearch.toLowerCase()) ||
+      dealData.talent.toLowerCase().includes(fileSearch.toLowerCase())
+
+    const hasMatchingFiles = dealData.files.some(file =>
+      file.name.toLowerCase().includes(fileSearch.toLowerCase())
+    )
+
+    return dealMatches || hasMatchingFiles
+  })
+
+  // Filter files within each deal
+  const getVisibleFiles = (dealData) => {
+    return dealData.files.filter(file =>
+      file.name.toLowerCase().includes(fileSearch.toLowerCase()) ||
+      dealData.dealName.toLowerCase().includes(fileSearch.toLowerCase()) ||
+      dealData.talent.toLowerCase().includes(fileSearch.toLowerCase())
+    )
+  }
+
+  const toggleDealExpanded = (dealId) => {
+    setExpandedDeals(prev => ({
+      ...prev,
+      [dealId]: !prev[dealId]
+    }))
+  }
+
+  const totalFiles = Object.values(dealFilesMap).reduce((sum, deal) => sum + deal.files.length, 0)
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -3308,29 +3336,95 @@ function FileSearchPage({ deals, downloadFile }) {
         />
       </div>
 
-      {filteredFiles.length === 0 ? (
+      {totalFiles === 0 ? (
         <p style={{ color: 'var(--gray-600)', textAlign: 'center', padding: '32px' }}>
-          {allFiles.length === 0 ? 'No files attached to any deals' : 'No files match your search'}
+          No files attached to any deals
+        </p>
+      ) : filteredDeals.length === 0 ? (
+        <p style={{ color: 'var(--gray-600)', textAlign: 'center', padding: '32px' }}>
+          No files match your search
         </p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-          {filteredFiles.map((file, idx) => (
-            <div key={idx} style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontWeight: '500', fontSize: '14px' }}>📎 {file.name}</p>
-                <p style={{ margin: '0 0 2px 0', fontSize: '12px', color: 'var(--gray-600)' }}>Deal: {file.dealName}</p>
-                <p style={{ margin: '0 0 2px 0', fontSize: '12px', color: 'var(--gray-600)' }}>Talent: {file.talent}</p>
-                <p style={{ margin: '0', fontSize: '11px', color: 'var(--gray-600)' }}>{(file.size / 1024).toFixed(1)} KB - Status: {file.dealStatus}</p>
+          {filteredDeals.map(([dealId, dealData]) => {
+            const visibleFiles = getVisibleFiles(dealData)
+            const isExpanded = expandedDeals[dealId] ?? true // Expanded by default
+
+            return (
+              <div key={dealId} style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', overflow: 'hidden' }}>
+                {/* Deal Header - Collapsible */}
+                <div
+                  onClick={() => toggleDealExpanded(dealId)}
+                  style={{
+                    padding: '16px',
+                    backgroundColor: 'var(--gray-100)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    userSelect: 'none'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>
+                      {isExpanded ? '▼' : '▶'} {dealData.dealName}
+                    </p>
+                    <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                      Talent: {dealData.talent} | Status: {dealData.dealStatus} | {visibleFiles.length} file(s)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Files - Collapsible Content */}
+                {isExpanded && (
+                  <div style={{ padding: '12px 16px', borderTop: '1px solid var(--gray-300)' }}>
+                    {visibleFiles.map((file, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px',
+                          marginBottom: idx < visibleFiles.length - 1 ? '8px' : '0',
+                          backgroundColor: 'var(--gray-50)',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: '0' }}>
+                          <p style={{ margin: '0 0 4px 0', fontWeight: '500', fontSize: '13px', wordBreak: 'break-word' }}>
+                            📎 {file.name}
+                          </p>
+                          <p style={{ margin: '0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                            {(file.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => downloadFile(file)}
+                          style={{
+                            background: 'var(--primary)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            marginLeft: '12px',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => downloadFile(file)}
-                style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}
-              >
-                Download
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
