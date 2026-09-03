@@ -1347,7 +1347,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       brandRepIds: deal.brandRepIds || [],
       repForTalent: deal.repForTalent || '',
       repForTalentIds: deal.repForTalentIds || [],
-      services: deal.services || [],
+      services: Array.isArray(deal.services) ? deal.services : [],
       serviceDetails: deal.serviceDetails || {
         Performance: '',
         Appearance: '',
@@ -1950,7 +1950,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                       </label>
                     ))}
                   </div>
-                  {formData.services.length > 0 && (
+                  {Array.isArray(formData.services) && formData.services.length > 0 && (
                     <div style={{ paddingTop: '16px', borderTop: '1px solid var(--gray-300)' }}>
                       {formData.services.map(service => (
                         <div key={service} style={{ marginBottom: '12px', border: '1px solid var(--gray-300)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -2008,7 +2008,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                       ))}
                     </div>
                   )}
-                  {formData.services.includes('Appearance') && (
+                  {Array.isArray(formData.services) && formData.services.includes('Appearance') && (
                     <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--gray-300)' }}>
                       <label>Appearance Location</label>
                       <input type="text" placeholder="e.g., In-store, Event, Commercial shoot" value={formData.appearanceLocation} onChange={(e) => setFormData({...formData, appearanceLocation: e.target.value})} />
@@ -2252,7 +2252,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                         {deal.services && (
                           <div style={{ marginBottom: '8px' }}>
                             <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Services</p>
-                            <p style={{ margin: '0', fontSize: '12px' }}>{deal.services}</p>
+                            <p style={{ margin: '0', fontSize: '12px' }}>{Array.isArray(deal.services) ? deal.services.join(', ') : deal.services}</p>
                           </div>
                         )}
                         {deal.notes && (
