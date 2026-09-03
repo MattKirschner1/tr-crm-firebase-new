@@ -4054,7 +4054,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
                                 fontSize: '12px'
                               }}
                             >
-                              <strong>{suggestion.name}</strong> ({suggestion.email})
+                              <strong>{suggestion.name}</strong>
                             </div>
                           ))}
                         </div>
