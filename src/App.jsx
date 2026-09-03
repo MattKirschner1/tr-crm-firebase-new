@@ -59,6 +59,7 @@ function App() {
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [prClients, setPrClients] = useState([])
+  const [teamMembers, setTeamMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
@@ -68,6 +69,7 @@ function App() {
       setUser(currentUser)
       if (currentUser) {
         loadDeals()
+        loadTeamMembers()
         const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
@@ -130,6 +132,21 @@ function App() {
     }
   }
 
+  const loadTeamMembers = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'users'))
+      const members = snapshot.docs
+        .map(d => ({
+          name: d.data().email.split('@')[0].charAt(0).toUpperCase() + d.data().email.split('@')[0].slice(1),
+          email: d.data().email
+        }))
+        .sort((a, b) => a.email.localeCompare(b.email))
+      setTeamMembers(members)
+    } catch (error) {
+      console.error('Error loading team members:', error)
+    }
+  }
+
   const downloadFile = (file) => {
     if (!file.dataUrl) return
     const link = document.createElement('a')
@@ -138,6 +155,66 @@ function App() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const exportContactsAsCSV = () => {
+    if (contacts.length === 0) {
+      alert('No contacts to export')
+      return
+    }
+    const headers = ['Name', 'Email', 'Phone', 'Company', 'Title', 'Type', 'Notes']
+    const rows = contacts.map(c => [
+      c.name || '',
+      c.email || '',
+      c.phone || '',
+      c.company || '',
+      c.title || '',
+      c.type || '',
+      c.notes || ''
+    ])
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `contacts-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const exportDocuments = () => {
+    const allFiles = []
+    deals.forEach(deal => {
+      if (deal.fileAttachments && Array.isArray(deal.fileAttachments)) {
+        deal.fileAttachments.forEach(file => {
+          if (file.uploadedBy !== user.email || user.email === ADMIN_EMAIL) {
+            allFiles.push({
+              ...file,
+              dealBrand: deal.brand,
+              dealTalent: deal.talent
+            })
+          }
+        })
+      }
+    })
+
+    if (allFiles.length === 0) {
+      alert('No documents available to export')
+      return
+    }
+
+    allFiles.forEach(file => {
+      if (file.dataUrl) {
+        const link = document.createElement('a')
+        link.href = file.dataUrl
+        link.download = file.name
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    })
   }
 
   if (loading) {
@@ -266,10 +343,10 @@ function App() {
 
       <main className="main-content">
         {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} />}
-        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} />}
-        {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} />}
-        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} />}
-        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} />}
+        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} teamMembers={teamMembers} />}
+        {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
+        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
+        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
@@ -1105,7 +1182,7 @@ function Dashboard({ deals, contacts, isAdmin }) {
   )
 }
 
-function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile }) {
+function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile, teamMembers }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -1183,8 +1260,14 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const filesWithUploadedBy = (formData.fileAttachments || []).map(file => ({
+        ...file,
+        uploadedBy: user.email
+      }))
+
       const dataToSave = {
         ...formData,
+        fileAttachments: filesWithUploadedBy,
         feePaid: isAdmin ? parseFloat(formData.feePaid) : 0,
         feeCharged: isAdmin ? parseFloat(formData.feeCharged) : 0,
         prCost: parseFloat(formData.prCost),
@@ -1577,10 +1660,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                 <div className="form-group">
                   <label>Deal Owner</label>
                   <select value={formData.dealOwnerEmail} onChange={(e) => {
-                    const selectedMember = TEAM_MEMBERS.find(m => m.email === e.target.value)
+                    const selectedMember = teamMembers.find(m => m.email === e.target.value)
                     setFormData({ ...formData, dealOwnerEmail: e.target.value, dealOwnerName: selectedMember?.name || '' })
                   }} required>
-                    {TEAM_MEMBERS.map(member => (
+                    {teamMembers.map(member => (
                       <option key={member.email} value={member.email}>{member.name}</option>
                     ))}
                   </select>
@@ -2393,7 +2476,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   )
 }
 
-function ContactsPage({ contacts, user, onReload, isAdmin }) {
+function ContactsPage({ contacts, user, onReload, isAdmin, exportContactsAsCSV }) {
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -2569,6 +2652,9 @@ function ContactsPage({ contacts, user, onReload, isAdmin }) {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-primary" onClick={() => { resetForm(); setShowForm(true) }}>
             New Contact
+          </button>
+          <button className="btn btn-secondary" onClick={exportContactsAsCSV}>
+            Export Contacts
           </button>
           {isAdmin && (
             <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()} disabled={importing}>
@@ -3343,23 +3429,32 @@ function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getCo
   )
 }
 
-function FileSearchPage({ deals, downloadFile }) {
+function FileSearchPage({ deals, downloadFile, exportDocuments, user }) {
   const [fileSearch, setFileSearch] = useState('')
   const [expandedDeals, setExpandedDeals] = useState({})
 
   // Group files by deal
   const dealFilesMap = {}
+  const ADMIN_EMAIL = 'matt@talentresources.com'
   deals.forEach(deal => {
     if (deal.fileAttachments && deal.fileAttachments.length > 0) {
       const dealKey = deal.id
-      dealFilesMap[dealKey] = {
-        dealName: deal.brand || 'Unknown Brand',
-        talent: deal.talent || 'Unknown Talent',
-        dealStatus: deal.status || 'Unknown',
-        files: deal.fileAttachments.map(file => ({
-          ...file,
-          dealId: deal.id
-        }))
+      const visibleFiles = deal.fileAttachments.filter(file => {
+        if (file.uploadedBy === ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
+          return false
+        }
+        return true
+      })
+      if (visibleFiles.length > 0) {
+        dealFilesMap[dealKey] = {
+          dealName: deal.brand || 'Unknown Brand',
+          talent: deal.talent || 'Unknown Talent',
+          dealStatus: deal.status || 'Unknown',
+          files: visibleFiles.map(file => ({
+            ...file,
+            dealId: deal.id
+          }))
+        }
       }
     }
   })
@@ -3397,7 +3492,12 @@ function FileSearchPage({ deals, downloadFile }) {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '24px', fontSize: '24px', fontWeight: '700' }}>File Search</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h1 style={{ margin: '0', fontSize: '24px', fontWeight: '700' }}>File Search</h1>
+        <button className="btn btn-secondary" onClick={exportDocuments}>
+          Export Documents
+        </button>
+      </div>
 
       <div style={{ marginBottom: '24px' }}>
         <input
