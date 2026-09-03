@@ -1087,16 +1087,23 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
 
   const ownerMetrics = {}
   filteredDeals.forEach(deal => {
-    const owner = deal.dealOwnerName || 'Unassigned'
-    if (!ownerMetrics[owner]) {
-      ownerMetrics[owner] = { deals: 0, revenue: 0, profit: 0 }
+    const ownerEmail = deal.dealOwnerEmail || 'unassigned'
+    if (!ownerMetrics[ownerEmail]) {
+      ownerMetrics[ownerEmail] = { deals: 0, revenue: 0, profit: 0, name: deal.dealOwnerName || 'Unassigned' }
     }
-    ownerMetrics[owner].deals += 1
+    ownerMetrics[ownerEmail].deals += 1
     if (isAdmin) {
-      ownerMetrics[owner].revenue += (deal.feeCharged || 0)
-      ownerMetrics[owner].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
+      ownerMetrics[ownerEmail].revenue += (deal.feeCharged || 0)
+      ownerMetrics[ownerEmail].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
     }
   })
+
+  // Look up current names from teamUsers to ensure we always show the latest name
+  const getOwnerName = (email) => {
+    if (email === 'unassigned') return 'Unassigned'
+    const user = teamUsers.find(u => u.email === email)
+    return user?.name || email.split('@')[0]
+  }
 
   const sortedOwners = Object.entries(ownerMetrics).sort((a, b) => b[1].deals - a[1].deals)
 
@@ -1178,22 +1185,23 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
               {sortedOwners.length === 0 ? (
                 <tr><td colSpan={isAdmin ? 5 : 3} style={{ textAlign: 'center' }}>No deals yet</td></tr>
               ) : (
-                sortedOwners.map(([owner, metrics]) => {
-                  const isExpanded = expandedOwners.has(owner)
-                  const ownerDeals = filteredDeals.filter(d => (d.dealOwnerName || 'Unassigned') === owner)
+                sortedOwners.map(([ownerEmail, metrics]) => {
+                  const isExpanded = expandedOwners.has(ownerEmail)
+                  const ownerDeals = filteredDeals.filter(d => (d.dealOwnerEmail || 'unassigned') === ownerEmail)
+                  const displayName = getOwnerName(ownerEmail)
                   return (
-                    <React.Fragment key={owner}>
+                    <React.Fragment key={ownerEmail}>
                       <tr onClick={() => {
                         const newExpanded = new Set(expandedOwners)
-                        if (newExpanded.has(owner)) {
-                          newExpanded.delete(owner)
+                        if (newExpanded.has(ownerEmail)) {
+                          newExpanded.delete(ownerEmail)
                         } else {
-                          newExpanded.add(owner)
+                          newExpanded.add(ownerEmail)
                         }
                         setExpandedOwners(newExpanded)
                       }} style={{ cursor: 'pointer' }}>
                         <td style={{ textAlign: 'center', width: '40px' }}>{isExpanded ? '▼' : '▶'}</td>
-                        <td><strong>{owner}</strong></td>
+                        <td><strong>{displayName}</strong></td>
                         <td>{metrics.deals}</td>
                         {isAdmin && (
                           <>
