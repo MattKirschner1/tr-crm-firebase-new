@@ -269,8 +269,7 @@ function DealsPage({ deals, contacts, user, onReload, onContactAdded }) {
   }
 
   const handleDelete = async (id) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (window.confirm('Delete this deal?')) {
+    if (confirm('Delete this deal?')) {
       try {
         await deleteDoc(doc(db, 'deals', id))
         onReload()
@@ -512,8 +511,7 @@ function ContactsPage({ contacts, user, onReload }) {
   }
 
   const handleDelete = async (id) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (window.confirm('Delete this contact?')) {
+    if (confirm('Delete this contact?')) {
       try {
         await deleteDoc(doc(db, 'contacts', id))
         onReload()
