@@ -1546,7 +1546,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       sagFee: deal.sagFee || false,
       brandReps: deal.brandReps || [],
       brandRepIds: deal.brandRepIds || [],
-      repForTalent: deal.repForTalent || '',
+      repForTalent: Array.isArray(deal.repForTalent) ? deal.repForTalent : (deal.repForTalent ? [deal.repForTalent] : []),
       repForTalentIds: deal.repForTalentIds || [],
       services: Array.isArray(deal.services) ? deal.services : [],
       serviceDetails: deal.serviceDetails || {
@@ -4003,8 +4003,9 @@ function PRClientsPage({ prClients, setPrClients, user }) {
             {formData.accountOwners.map((owner, idx) => {
               const searchValue = ownerSearches[idx] || ''
               const ownerSuggestions = searchValue.trim() ? teamUsers.filter(u =>
-                u.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-                u.email.toLowerCase().includes(searchValue.toLowerCase())
+                u.name && u.name.trim() &&
+                (u.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+                u.email.toLowerCase().includes(searchValue.toLowerCase()))
               ) : []
 
               return (
