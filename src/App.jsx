@@ -182,33 +182,11 @@ function App() {
                 💼 <span>Deals</span>
               </button>
               <button
-                className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
-                onClick={() => { setCurrentPage('contacts'); setMenuOpen(false) }}
-              >
-                👥 <span>Contacts</span>
-              </button>
-              <button
                 className={`nav-item ${currentPage === 'filesearch' ? 'active' : ''}`}
                 onClick={() => { setCurrentPage('filesearch'); setMenuOpen(false) }}
               >
                 🔍 <span>File Search</span>
               </button>
-              {isAdmin && (
-                <>
-                  <button
-                    className={`nav-item ${currentPage === 'users' ? 'active' : ''}`}
-                    onClick={() => { setCurrentPage('users'); setMenuOpen(false) }}
-                  >
-                    👨‍💼 <span>Team</span>
-                  </button>
-                  <button
-                    className={`nav-item ${currentPage === 'usage' ? 'active' : ''}`}
-                    onClick={() => { setCurrentPage('usage'); setMenuOpen(false) }}
-                  >
-                    📊 <span>Usage</span>
-                  </button>
-                </>
-              )}
             </>
           )}
 
@@ -241,8 +219,40 @@ function App() {
               >
                 ⏰ <span>Contract Alerts</span>
               </button>
+              <button
+                className={`nav-item ${currentPage === 'pr-filesearch' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('pr-filesearch'); setMenuOpen(false) }}
+              >
+                🔍 <span>File Search</span>
+              </button>
             </>
           )}
+
+          {/* SEPARATE SECTION - Contacts, Team, Usage */}
+          <div style={{ borderTop: '1px solid var(--gray-300)', marginTop: '16px', paddingTop: '12px' }}>
+            <button
+              className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
+              onClick={() => { setCurrentPage('contacts'); setMenuOpen(false) }}
+            >
+              👥 <span>Contacts</span>
+            </button>
+            {isAdmin && (
+              <>
+                <button
+                  className={`nav-item ${currentPage === 'users' ? 'active' : ''}`}
+                  onClick={() => { setCurrentPage('users'); setMenuOpen(false) }}
+                >
+                  👨‍💼 <span>Team</span>
+                </button>
+                <button
+                  className={`nav-item ${currentPage === 'usage' ? 'active' : ''}`}
+                  onClick={() => { setCurrentPage('usage'); setMenuOpen(false) }}
+                >
+                  📊 <span>Usage</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <div className="navbar-user">
           <div className="user-info">
@@ -259,6 +269,7 @@ function App() {
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} />}
+        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} />}
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
