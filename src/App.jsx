@@ -1191,8 +1191,28 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const [selectedBrand, setSelectedBrand] = useState(null)
   const [selectedAgency, setSelectedAgency] = useState(null)
   const [dealFileSearch, setDealFileSearch] = useState('')
+  const [dealOwnerSearch, setDealOwnerSearch] = useState('')
+  const [showDealOwnerSuggestions, setShowDealOwnerSuggestions] = useState(false)
+  const [teamUsers, setTeamUsers] = useState([])
 
-  const currentUser = TEAM_MEMBERS.find(m => m.email === user.email)
+  // Load team users from Firestore on mount
+  useEffect(() => {
+    const loadTeamUsers = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'users'))
+        const users = snapshot.docs.map(d => ({
+          email: d.data().email,
+          name: d.data().name || d.data().email.split('@')[0]
+        }))
+        setTeamUsers(users)
+      } catch (error) {
+        console.error('Error loading team users:', error)
+      }
+    }
+    if (user) loadTeamUsers()
+  }, [user])
+
+  const currentUser = teamUsers.find(m => m.email === user.email)
   const currentUserName = currentUser?.name || user.email
 
   const [formData, setFormData] = useState({
@@ -1391,6 +1411,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     setContactSearch('')
     setRepTalentSearch('')
     setBrandRepSearch('')
+    setDealOwnerSearch('')
     setEditingId(null)
     setShowForm(false)
   }
@@ -1508,6 +1529,8 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     setContactSearch(contactName)
     const repTalentName = deal.repForTalentId ? contacts.find(c => c.id === deal.repForTalentId)?.name || deal.repForTalent || '' : deal.repForTalent || ''
     setRepTalentSearch(repTalentName)
+    const dealOwnerName = deal.dealOwnerName || teamUsers.find(u => u.email === deal.dealOwnerEmail)?.name || deal.dealOwnerEmail
+    setDealOwnerSearch(dealOwnerName)
     if (Array.isArray(deal.services) && deal.services.length > 0) {
       const expanded = {}
       deal.services.forEach(s => {
@@ -1642,16 +1665,39 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
             <h2>{editingId ? 'Edit Deal' : 'New Deal'}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', '@media (max-width: 768px)': { gridTemplateColumns: '1fr' } }}>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label>Deal Owner</label>
-                  <select value={formData.dealOwnerEmail} onChange={(e) => {
-                    const selectedMember = TEAM_MEMBERS.find(m => m.email === e.target.value)
-                    setFormData({ ...formData, dealOwnerEmail: e.target.value, dealOwnerName: selectedMember?.name || '' })
-                  }} required>
-                    {TEAM_MEMBERS.map(member => (
-                      <option key={member.email} value={member.email}>{member.name}</option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    placeholder="Type to search team members..."
+                    value={dealOwnerSearch}
+                    onChange={(e) => {
+                      setDealOwnerSearch(e.target.value)
+                      setShowDealOwnerSuggestions(true)
+                    }}
+                    onFocus={() => setShowDealOwnerSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowDealOwnerSuggestions(false), 200)}
+                    required
+                  />
+                  {showDealOwnerSuggestions && dealOwnerSearch && (
+                    <div style={{ position: 'absolute', top: '100%', left: '0', right: '0', backgroundColor: 'white', border: '1px solid var(--gray-300)', borderTop: 'none', borderRadius: '0 0 6px 6px', maxHeight: '200px', overflowY: 'auto', zIndex: '10' }}>
+                      {teamUsers.filter(u => u.name.toLowerCase().includes(dealOwnerSearch.toLowerCase()) || u.email.toLowerCase().includes(dealOwnerSearch.toLowerCase())).map(user => (
+                        <div
+                          key={user.email}
+                          onClick={() => {
+                            setFormData({ ...formData, dealOwnerEmail: user.email, dealOwnerName: user.name })
+                            setDealOwnerSearch(user.name)
+                            setShowDealOwnerSuggestions(false)
+                          }}
+                          style={{ padding: '10px', cursor: 'pointer', borderBottom: '1px solid var(--gray-200)' }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--gray-100)'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                        >
+                          {user.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Status</label>
