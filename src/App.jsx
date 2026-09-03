@@ -58,8 +58,10 @@ function App() {
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
+  const [prClients, setPrClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -68,6 +70,7 @@ function App() {
         loadDeals()
         const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
+        loadPRClients()
 
         // Track last login
         try {
@@ -116,6 +119,17 @@ function App() {
     }
   }
 
+  const loadPRClients = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'prClients'))
+      const clients = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      clients.sort((a, b) => a.clientName.localeCompare(b.clientName))
+      setPrClients(clients)
+    } catch (error) {
+      console.error('Error loading PR clients:', error)
+    }
+  }
+
   const downloadFile = (file) => {
     if (!file.dataUrl) return
     const link = document.createElement('a')
@@ -144,43 +158,82 @@ function App() {
           <span className="brand-text">Talent Resources</span>
         </div>
         <div className="nav-menu">
+          {/* TALENT PROCUREMENT SECTION */}
           <button
-            className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
-            onClick={() => { setCurrentPage('dashboard'); setMenuOpen(false) }}
+            className="nav-section-header"
+            onClick={() => setExpandedSections({ ...expandedSections, talent: !expandedSections.talent })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: '600', width: '100%' }}
           >
-            📊 <span>Dashboard</span>
+            <span>{expandedSections.talent ? '▼' : '▶'}</span>
+            <span>💼 Talent Procurement</span>
           </button>
-          <button
-            className={`nav-item ${currentPage === 'deals' ? 'active' : ''}`}
-            onClick={() => { setCurrentPage('deals'); setMenuOpen(false) }}
-          >
-            💼 <span>Deals</span>
-          </button>
-          <button
-            className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
-            onClick={() => { setCurrentPage('contacts'); setMenuOpen(false) }}
-          >
-            👥 <span>Contacts</span>
-          </button>
-          <button
-            className={`nav-item ${currentPage === 'filesearch' ? 'active' : ''}`}
-            onClick={() => { setCurrentPage('filesearch'); setMenuOpen(false) }}
-          >
-            🔍 <span>File Search</span>
-          </button>
-          {isAdmin && (
+          {expandedSections.talent && (
             <>
               <button
-                className={`nav-item ${currentPage === 'users' ? 'active' : ''}`}
-                onClick={() => { setCurrentPage('users'); setMenuOpen(false) }}
+                className={`nav-item ${currentPage === 'dashboard' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('dashboard'); setMenuOpen(false) }}
               >
-                👨‍💼 <span>Team</span>
+                📊 <span>Dashboard</span>
               </button>
               <button
-                className={`nav-item ${currentPage === 'usage' ? 'active' : ''}`}
-                onClick={() => { setCurrentPage('usage'); setMenuOpen(false) }}
+                className={`nav-item ${currentPage === 'deals' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('deals'); setMenuOpen(false) }}
               >
-                📊 <span>Usage</span>
+                💼 <span>Deals</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'contacts' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('contacts'); setMenuOpen(false) }}
+              >
+                👥 <span>Contacts</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'filesearch' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('filesearch'); setMenuOpen(false) }}
+              >
+                🔍 <span>File Search</span>
+              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    className={`nav-item ${currentPage === 'users' ? 'active' : ''}`}
+                    onClick={() => { setCurrentPage('users'); setMenuOpen(false) }}
+                  >
+                    👨‍💼 <span>Team</span>
+                  </button>
+                  <button
+                    className={`nav-item ${currentPage === 'usage' ? 'active' : ''}`}
+                    onClick={() => { setCurrentPage('usage'); setMenuOpen(false) }}
+                  >
+                    📊 <span>Usage</span>
+                  </button>
+                </>
+              )}
+            </>
+          )}
+
+          {/* PUBLIC RELATIONS SECTION */}
+          <button
+            className="nav-section-header"
+            onClick={() => setExpandedSections({ ...expandedSections, pr: !expandedSections.pr })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: '600', width: '100%', marginTop: '8px' }}
+          >
+            <span>{expandedSections.pr ? '▼' : '▶'}</span>
+            <span>📢 Public Relations</span>
+          </button>
+          {expandedSections.pr && (
+            <>
+              <button
+                className={`nav-item ${currentPage === 'pr-clients' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('pr-clients'); setMenuOpen(false) }}
+              >
+                🤝 <span>Current Clients</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'pr-dashboard' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('pr-dashboard'); setMenuOpen(false) }}
+              >
+                📈 <span>Revenue Dashboard</span>
               </button>
             </>
           )}
@@ -200,6 +253,8 @@ function App() {
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} />}
+        {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
+        {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
       </main>
@@ -3437,6 +3492,378 @@ function FileSearchPage({ deals, downloadFile }) {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+function PRClientsPage({ prClients, setPrClients, user }) {
+  const [showForm, setShowForm] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [formData, setFormData] = useState({
+    clientName: '',
+    monthlyFee: '',
+    clientContactName: '',
+    clientContactEmail: '',
+    clientContactPhone: '',
+    accountOwners: [{ name: '', email: '' }],
+    contracts: []
+  })
+
+  const filteredClients = prClients.filter(client =>
+    client.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.clientContactName.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const handleAddClient = async () => {
+    if (!formData.clientName || !formData.monthlyFee) {
+      alert('Please fill in client name and monthly fee')
+      return
+    }
+
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, 'prClients', editingId), {
+          ...formData,
+          monthlyFee: parseFloat(formData.monthlyFee),
+          updatedAt: new Date()
+        })
+        setPrClients(prClients.map(c => c.id === editingId ? { id: editingId, ...formData, monthlyFee: parseFloat(formData.monthlyFee) } : c))
+      } else {
+        const docRef = await addDoc(collection(db, 'prClients'), {
+          ...formData,
+          monthlyFee: parseFloat(formData.monthlyFee),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        setPrClients([...prClients, { id: docRef.id, ...formData, monthlyFee: parseFloat(formData.monthlyFee) }])
+      }
+      setFormData({
+        clientName: '',
+        monthlyFee: '',
+        clientContactName: '',
+        clientContactEmail: '',
+        clientContactPhone: '',
+        accountOwners: [{ name: '', email: '' }],
+        contracts: []
+      })
+      setEditingId(null)
+      setShowForm(false)
+    } catch (error) {
+      console.error('Error saving client:', error)
+      alert('Error saving client')
+    }
+  }
+
+  const handleDeleteClient = async (id) => {
+    if (window.confirm('Delete this client?')) {
+      try {
+        await deleteDoc(doc(db, 'prClients', id))
+        setPrClients(prClients.filter(c => c.id !== id))
+      } catch (error) {
+        console.error('Error deleting client:', error)
+      }
+    }
+  }
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h1 style={{ margin: '0', fontSize: '24px', fontWeight: '700' }}>Current Clients</h1>
+        <button
+          onClick={() => {
+            setShowForm(!showForm)
+            setEditingId(null)
+            setFormData({
+              clientName: '',
+              monthlyFee: '',
+              clientContactName: '',
+              clientContactEmail: '',
+              clientContactPhone: '',
+              accountOwners: [{ name: '', email: '' }],
+              contracts: []
+            })
+          }}
+          style={{
+            background: 'var(--primary)',
+            color: 'white',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: '500'
+          }}
+        >
+          {showForm ? 'Cancel' : '+ Add Client'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', marginBottom: '24px' }}>
+          <h2 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>
+            {editingId ? 'Edit Client' : 'New Client'}
+          </h2>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Client Name</label>
+              <input
+                type="text"
+                value={formData.clientName}
+                onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="Client name"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Monthly Fee ($)</label>
+              <input
+                type="number"
+                value={formData.monthlyFee}
+                onChange={(e) => setFormData({ ...formData, monthlyFee: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Client Contact Name</label>
+              <input
+                type="text"
+                value={formData.clientContactName}
+                onChange={(e) => setFormData({ ...formData, clientContactName: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="Contact name"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Client Email</label>
+              <input
+                type="email"
+                value={formData.clientContactEmail}
+                onChange={(e) => setFormData({ ...formData, clientContactEmail: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="email@example.com"
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Client Phone</label>
+            <input
+              type="text"
+              value={formData.clientContactPhone}
+              onChange={(e) => setFormData({ ...formData, clientContactPhone: e.target.value })}
+              style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+              placeholder="Phone number"
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Account Owners</label>
+            {formData.accountOwners.map((owner, idx) => (
+              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '8px', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  value={owner.name}
+                  onChange={(e) => {
+                    const newOwners = [...formData.accountOwners]
+                    newOwners[idx].name = e.target.value
+                    setFormData({ ...formData, accountOwners: newOwners })
+                  }}
+                  placeholder="Owner name"
+                  style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
+                />
+                <input
+                  type="email"
+                  value={owner.email}
+                  onChange={(e) => {
+                    const newOwners = [...formData.accountOwners]
+                    newOwners[idx].email = e.target.value
+                    setFormData({ ...formData, accountOwners: newOwners })
+                  }}
+                  placeholder="Owner email"
+                  style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
+                />
+                <button
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      accountOwners: formData.accountOwners.filter((_, i) => i !== idx)
+                    })
+                  }}
+                  style={{
+                    background: '#ff6b6b',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                setFormData({
+                  ...formData,
+                  accountOwners: [...formData.accountOwners, { name: '', email: '' }]
+                })
+              }}
+              style={{
+                background: 'var(--gray-300)',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              + Add Owner
+            </button>
+          </div>
+
+          <button
+            onClick={handleAddClient}
+            style={{
+              background: 'var(--primary)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            {editingId ? 'Update Client' : 'Add Client'}
+          </button>
+        </div>
+      )}
+
+      <div style={{ marginBottom: '16px' }}>
+        <input
+          type="text"
+          placeholder="Search clients by name or contact..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: '100%', padding: '12px 16px', fontSize: '14px', border: '1px solid var(--gray-300)', borderRadius: '6px', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      {filteredClients.length === 0 ? (
+        <p style={{ color: 'var(--gray-600)', textAlign: 'center', padding: '32px' }}>
+          {prClients.length === 0 ? 'No clients yet. Add one to get started.' : 'No clients match your search.'}
+        </p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+          {filteredClients.map((client) => (
+            <div key={client.id} style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>{client.clientName}</p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                    Contact: {client.clientContactName} | {client.clientContactEmail} | {client.clientContactPhone}
+                  </p>
+                  <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                    Monthly Fee: ${client.monthlyFee?.toFixed(2) || '0.00'}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      setFormData(client)
+                      setEditingId(client.id)
+                      setShowForm(true)
+                    }}
+                    style={{
+                      background: 'var(--primary)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClient(client.id)}
+                    style={{
+                      background: '#ff6b6b',
+                      color: 'white',
+                      border: 'none',
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              {client.accountOwners && client.accountOwners.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '600' }}>Account Owners:</p>
+                  {client.accountOwners.map((owner, idx) => (
+                    <p key={idx} style={{ margin: '2px 0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                      • {owner.name} ({owner.email})
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PRDashboardPage({ prClients }) {
+  const totalMonthly = prClients.reduce((sum, client) => sum + (client.monthlyFee || 0), 0)
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700' }}>PR Revenue Dashboard</h1>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Total Monthly Revenue</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+            ${totalMonthly.toFixed(2)}
+          </p>
+        </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Active Clients</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+            {prClients.length}
+          </p>
+        </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Average Monthly</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+            ${prClients.length > 0 ? (totalMonthly / prClients.length).toFixed(2) : '0.00'}
+          </p>
+        </div>
+      </div>
+
+      <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700' }}>Clients by Monthly Fee</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+        {prClients
+          .sort((a, b) => (b.monthlyFee || 0) - (a.monthlyFee || 0))
+          .map((client) => (
+            <div key={client.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--gray-300)', borderRadius: '6px' }}>
+              <span>{client.clientName}</span>
+              <span style={{ fontWeight: '600' }}>${client.monthlyFee?.toFixed(2) || '0.00'}</span>
+            </div>
+          ))}
+      </div>
     </div>
   )
 }
