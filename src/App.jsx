@@ -62,6 +62,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
+  const fileInputRef = React.useRef(null)
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -235,6 +236,12 @@ function App() {
               >
                 📈 <span>Revenue Dashboard</span>
               </button>
+              <button
+                className={`nav-item ${currentPage === 'pr-alerts' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('pr-alerts'); setMenuOpen(false) }}
+              >
+                ⏰ <span>Contract Alerts</span>
+              </button>
             </>
           )}
         </div>
@@ -255,6 +262,7 @@ function App() {
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} />}
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
+        {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
       </main>
@@ -3509,6 +3517,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
     accountOwners: [{ name: '', email: '' }],
     contracts: []
   })
+  const contractFileInputRef = React.useRef(null)
 
   const filteredClients = prClients.filter(client =>
     client.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -3564,6 +3573,40 @@ function PRClientsPage({ prClients, setPrClients, user }) {
         console.error('Error deleting client:', error)
       }
     }
+  }
+
+  const handleContractFileUpload = (e) => {
+    const files = e.target.files
+    if (!files) return
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const newContract = {
+          id: Date.now().toString(),
+          name: file.name,
+          startDate: '',
+          endDate: '',
+          fileName: file.name,
+          fileData: event.target.result
+        }
+        setFormData({
+          ...formData,
+          contracts: [...(formData.contracts || []), newContract]
+        })
+      }
+      reader.readAsDataURL(file)
+    })
+    if (contractFileInputRef.current) {
+      contractFileInputRef.current.value = ''
+    }
+  }
+
+  const removeContract = (contractId) => {
+    setFormData({
+      ...formData,
+      contracts: formData.contracts.filter(c => c.id !== contractId)
+    })
   }
 
   return (
@@ -3727,6 +3770,84 @@ function PRClientsPage({ prClients, setPrClients, user }) {
             </button>
           </div>
 
+          <div style={{ marginBottom: '16px', borderTop: '1px solid var(--gray-300)', paddingTop: '16px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Contracts</label>
+            <input
+              ref={contractFileInputRef}
+              type="file"
+              multiple
+              onChange={handleContractFileUpload}
+              style={{ display: 'none' }}
+              accept="*"
+            />
+            <button
+              type="button"
+              onClick={() => contractFileInputRef.current?.click()}
+              style={{
+                background: 'var(--gray-300)',
+                border: 'none',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                marginBottom: '12px'
+              }}
+            >
+              📎 Upload Contract
+            </button>
+
+            {formData.contracts && formData.contracts.length > 0 && (
+              <div style={{ backgroundColor: 'var(--gray-50)', padding: '12px', borderRadius: '4px' }}>
+                {formData.contracts.map((contract, idx) => (
+                  <div key={contract.id} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: idx < formData.contracts.length - 1 ? '1px solid var(--gray-300)' : 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <p style={{ margin: '0', fontSize: '12px', fontWeight: '500' }}>📄 {contract.fileName}</p>
+                      <button
+                        type="button"
+                        onClick={() => removeContract(contract.id)}
+                        style={{
+                          background: '#ff6b6b',
+                          color: 'white',
+                          border: 'none',
+                          padding: '4px 8px',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '11px'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <input
+                        type="date"
+                        value={contract.startDate}
+                        onChange={(e) => {
+                          const updated = [...formData.contracts]
+                          updated[idx].startDate = e.target.value
+                          setFormData({ ...formData, contracts: updated })
+                        }}
+                        placeholder="Start Date"
+                        style={{ padding: '6px', border: '1px solid var(--gray-300)', borderRadius: '3px', fontSize: '11px' }}
+                      />
+                      <input
+                        type="date"
+                        value={contract.endDate}
+                        onChange={(e) => {
+                          const updated = [...formData.contracts]
+                          updated[idx].endDate = e.target.value
+                          setFormData({ ...formData, contracts: updated })
+                        }}
+                        placeholder="End Date"
+                        style={{ padding: '6px', border: '1px solid var(--gray-300)', borderRadius: '3px', fontSize: '11px' }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleAddClient}
             style={{
@@ -3808,12 +3929,25 @@ function PRClientsPage({ prClients, setPrClients, user }) {
                 </div>
               </div>
               {client.accountOwners && client.accountOwners.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px' }}>
+                <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px', marginBottom: '12px' }}>
                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '600' }}>Account Owners:</p>
                   {client.accountOwners.map((owner, idx) => (
                     <p key={idx} style={{ margin: '2px 0', fontSize: '11px', color: 'var(--gray-600)' }}>
                       • {owner.name} ({owner.email})
                     </p>
+                  ))}
+                </div>
+              )}
+              {client.contracts && client.contracts.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600' }}>Contracts:</p>
+                  {client.contracts.map((contract, idx) => (
+                    <div key={idx} style={{ fontSize: '11px', color: 'var(--gray-600)', marginBottom: '6px', paddingLeft: '12px' }}>
+                      <p style={{ margin: '0', fontWeight: '500' }}>📄 {contract.fileName}</p>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '10px' }}>
+                        {contract.startDate ? new Date(contract.startDate).toLocaleDateString() : 'No start'} to {contract.endDate ? new Date(contract.endDate).toLocaleDateString() : 'No end'}
+                      </p>
+                    </div>
                   ))}
                 </div>
               )}
@@ -3864,6 +3998,131 @@ function PRDashboardPage({ prClients }) {
             </div>
           ))}
       </div>
+    </div>
+  )
+}
+
+function PRContractAlertsPage({ prClients }) {
+  const getUpcomingExpirations = () => {
+    const today = new Date()
+    const alertDate = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000) // 15 days from now
+
+    const alerts = []
+    prClients.forEach(client => {
+      if (client.contracts && Array.isArray(client.contracts)) {
+        client.contracts.forEach(contract => {
+          if (contract.endDate) {
+            const endDate = new Date(contract.endDate)
+            const daysUntilExpiration = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
+
+            if (daysUntilExpiration <= 15 && daysUntilExpiration > 0) {
+              alerts.push({
+                clientName: client.clientName,
+                contractName: contract.fileName,
+                endDate: contract.endDate,
+                daysUntilExpiration,
+                accountOwners: client.accountOwners || [],
+                monthlyFee: client.monthlyFee
+              })
+            } else if (daysUntilExpiration <= 0) {
+              alerts.push({
+                clientName: client.clientName,
+                contractName: contract.fileName,
+                endDate: contract.endDate,
+                daysUntilExpiration,
+                accountOwners: client.accountOwners || [],
+                monthlyFee: client.monthlyFee,
+                isExpired: true
+              })
+            }
+          }
+        })
+      }
+    })
+
+    return alerts.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration)
+  }
+
+  const alerts = getUpcomingExpirations()
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700' }}>⏰ Contract Alerts</h1>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Expiring Soon (15 days)</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: '#ff6b6b' }}>
+            {alerts.filter(a => !a.isExpired).length}
+          </p>
+        </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Already Expired</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: '#dc2626' }}>
+            {alerts.filter(a => a.isExpired).length}
+          </p>
+        </div>
+      </div>
+
+      {alerts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', backgroundColor: 'var(--gray-50)', borderRadius: '8px', border: '1px solid var(--gray-300)' }}>
+          <p style={{ margin: '0', fontSize: '16px', color: 'var(--gray-600)', fontWeight: '500' }}>✓ No upcoming contract expirations</p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--gray-600)' }}>All contracts are current</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+          {alerts.map((alert, idx) => (
+            <div
+              key={idx}
+              style={{
+                border: `2px solid ${alert.isExpired ? '#dc2626' : alert.daysUntilExpiration <= 7 ? '#ff6b6b' : '#fbbf24'}`,
+                borderRadius: '6px',
+                padding: '16px',
+                backgroundColor: alert.isExpired ? '#fee2e2' : alert.daysUntilExpiration <= 7 ? '#fef2f2' : '#fffbeb'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>
+                    {alert.clientName}
+                  </p>
+                  <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                    📄 {alert.contractName}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{
+                    margin: '0 0 4px 0',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: alert.isExpired ? '#dc2626' : alert.daysUntilExpiration <= 7 ? '#ff6b6b' : '#f59e0b'
+                  }}>
+                    {alert.isExpired ? 'EXPIRED' : `${alert.daysUntilExpiration} days`}
+                  </p>
+                  <p style={{ margin: '0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                    Expires: {new Date(alert.endDate).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {alert.accountOwners && alert.accountOwners.length > 0 && (
+                <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '4px', marginTop: '12px', borderTop: `2px solid ${alert.isExpired ? '#fca5a5' : alert.daysUntilExpiration <= 7 ? '#fecaca' : '#fcd34d'}` }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Account Owners to Alert:</p>
+                  {alert.accountOwners.map((owner, oIdx) => (
+                    <p key={oIdx} style={{ margin: '2px 0', fontSize: '10px', color: 'var(--gray-600)' }}>
+                      • {owner.name} ({owner.email})
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ margin: '12px 0 0 0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                Monthly Revenue: <span style={{ fontWeight: '600' }}>${alert.monthlyFee?.toFixed(2) || '0.00'}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
