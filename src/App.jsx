@@ -53,23 +53,33 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [userProfile, setUserProfile] = useState(null)
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser)
       if (currentUser) {
         loadDeals()
-        
+
         const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
 
-        // Track last login
+        // Track last login and check profile completion
         try {
           const usersQuery = query(collection(db, 'users'), where('uid', '==', currentUser.uid))
           const snapshot = await getDocs(usersQuery)
           if (snapshot.docs.length > 0) {
             const userDoc = snapshot.docs[0]
+            const userData = userDoc.data()
+            setUserProfile(userData)
+
+            // Show profile completion modal if user doesn't have a name
+            if (!userData.name || userData.name.trim() === '') {
+              setShowProfileModal(true)
+            }
+
             await updateDoc(doc(db, 'users', userDoc.id), {
               lastLogin: new Date()
             })
@@ -202,8 +212,26 @@ function App() {
 
   const isAdmin = user.email === ADMIN_EMAIL
 
+  const handleProfileModalSave = async (fullName) => {
+    try {
+      const usersQuery = query(collection(db, 'users'), where('uid', '==', user.uid))
+      const snapshot = await getDocs(usersQuery)
+      if (snapshot.docs.length > 0) {
+        const userDoc = snapshot.docs[0]
+        await updateDoc(doc(db, 'users', userDoc.id), {
+          name: fullName
+        })
+        setShowProfileModal(false)
+        setUserProfile({ ...userProfile, name: fullName })
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error)
+    }
+  }
+
   return (
     <div className="app">
+      {showProfileModal && <ProfileCompletionModal user={user} onSave={handleProfileModalSave} />}
       <nav className={`navbar ${menuOpen ? 'open' : ''}`}>
         <div className="navbar-brand">
           <div className="logo-small">TR</div>
@@ -304,6 +332,12 @@ function App() {
                 </button>
               </>
             )}
+            <button
+              className={`nav-item ${currentPage === 'settings' ? 'active' : ''}`}
+              onClick={() => { setCurrentPage('settings'); setMenuOpen(false) }}
+            >
+              ⚙️ <span>Account Settings</span>
+            </button>
           </div>
         </div>
         <div className="navbar-user">
@@ -327,6 +361,7 @@ function App() {
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
+        {currentPage === 'settings' && <AccountSettingsPage user={user} onUpdate={() => {}} />}
       </main>
 
       <style>{`
@@ -856,6 +891,7 @@ function App() {
 function LoginPage({ onLogin }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
   const [isSignup, setIsSignup] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [error, setError] = useState('')
@@ -877,7 +913,8 @@ function LoginPage({ onLogin }) {
           email: email,
           uid: userCredential.user.uid,
           createdAt: new Date(),
-          status: 'active'
+          status: 'active',
+          name: fullName
         })
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password)
@@ -930,6 +967,18 @@ function LoginPage({ onLogin }) {
           </form>
         ) : (
           <form onSubmit={handleSubmit}>
+            {isSignup && (
+              <div className="form-group">
+                <label>Full Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                  required={isSignup}
+                />
+              </div>
+            )}
             <div className="form-group">
               <label>Email</label>
               <input
@@ -985,7 +1034,7 @@ function LoginPage({ onLogin }) {
               {isSignup ? 'Already have an account?' : "Don't have an account?"}
               {' '}
               <button
-                onClick={() => { setIsSignup(!isSignup); setError('') }}
+                onClick={() => { setIsSignup(!isSignup); setError(''); setFullName('') }}
                 style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
               >
                 {isSignup ? 'Sign In' : 'Sign Up'}
@@ -4309,6 +4358,207 @@ function PRContractAlertsPage({ prClients }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function ProfileCompletionModal({ user, onSave }) {
+  const [fullName, setFullName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSave = async () => {
+    if (!fullName.trim()) {
+      setError('Full name is required')
+      return
+    }
+    setLoading(true)
+    try {
+      await onSave(fullName)
+    } catch (err) {
+      setError('Failed to save profile. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: '500px' }}>
+        <h2 style={{ margin: '0 0 12px 0', fontSize: '20px' }}>Complete Your Profile</h2>
+        <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: 'var(--gray-600)' }}>
+          We need your full name to complete your profile. This will help the team identify you in the system.
+        </p>
+
+        <div className="form-group" style={{ marginBottom: '24px' }}>
+          <label>Full Name</label>
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Enter your full name"
+            style={{
+              padding: '10px 12px',
+              border: '1px solid var(--gray-300)',
+              borderRadius: '6px',
+              fontSize: '14px',
+              width: '100%'
+            }}
+            autoFocus
+            onKeyPress={(e) => e.key === 'Enter' && handleSave()}
+          />
+        </div>
+
+        {error && (
+          <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '16px' }}>
+            {error}
+          </p>
+        )}
+
+        <div className="modal-actions">
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="btn btn-primary"
+            style={{
+              opacity: loading ? 0.6 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AccountSettingsPage({ user, onUpdate }) {
+  const [name, setName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const usersQuery = query(collection(db, 'users'), where('uid', '==', user.uid))
+        const snapshot = await getDocs(usersQuery)
+        if (snapshot.docs.length > 0) {
+          const userData = snapshot.docs[0].data()
+          setName(userData.name || '')
+        }
+        setLoading(false)
+      } catch (error) {
+        console.error('Error loading user profile:', error)
+        setError('Failed to load profile')
+        setLoading(false)
+      }
+    }
+    loadUserProfile()
+  }, [user])
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setError('Full name is required')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    setSuccessMessage('')
+
+    try {
+      const usersQuery = query(collection(db, 'users'), where('uid', '==', user.uid))
+      const snapshot = await getDocs(usersQuery)
+      if (snapshot.docs.length > 0) {
+        const userDoc = snapshot.docs[0]
+        await updateDoc(doc(db, 'users', userDoc.id), {
+          name: name
+        })
+        setSuccessMessage('Profile updated successfully')
+        if (onUpdate) onUpdate()
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      setError('Failed to update profile. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return <div style={{ padding: '24px', textAlign: 'center' }}>Loading...</div>
+  }
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700' }}>Account Settings</h1>
+
+        <div style={{ backgroundColor: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '24px' }}>
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label>Email</label>
+            <input
+              type="email"
+              value={user.email}
+              disabled
+              style={{
+                padding: '10px 12px',
+                border: '1px solid var(--gray-300)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                backgroundColor: 'var(--gray-100)',
+                color: 'var(--gray-600)',
+                cursor: 'not-allowed'
+              }}
+            />
+            <p style={{ fontSize: '12px', color: 'var(--gray-600)', margin: '4px 0 0 0' }}>Contact administrator to change email</p>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label>Full Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your full name"
+              style={{
+                padding: '10px 12px',
+                border: '1px solid var(--gray-300)',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+
+          {error && (
+            <p style={{ color: '#dc2626', fontSize: '14px', marginBottom: '16px' }}>
+              {error}
+            </p>
+          )}
+
+          {successMessage && (
+            <p style={{ color: '#16a34a', fontSize: '14px', marginBottom: '16px' }}>
+              {successMessage}
+            </p>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn btn-primary btn-large"
+            style={{
+              width: '100%',
+              opacity: saving ? 0.6 : 1,
+              cursor: saving ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
