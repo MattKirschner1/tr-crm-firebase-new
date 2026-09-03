@@ -62,7 +62,6 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
-  const fileInputRef = React.useRef(null)
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -4005,7 +4004,6 @@ function PRDashboardPage({ prClients }) {
 function PRContractAlertsPage({ prClients }) {
   const getUpcomingExpirations = () => {
     const today = new Date()
-    const alertDate = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000) // 15 days from now
 
     const alerts = []
     prClients.forEach(client => {
