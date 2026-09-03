@@ -174,7 +174,8 @@ function App() {
     deals.forEach(deal => {
       if (deal.fileAttachments && Array.isArray(deal.fileAttachments)) {
         deal.fileAttachments.forEach(file => {
-          if (file.uploadedBy !== user.email || user.email === ADMIN_EMAIL) {
+          // Only admins can export everything, others can only export their own
+          if (user.email === ADMIN_EMAIL || file.uploadedBy === user.email) {
             allFiles.push({
               ...file,
               dealBrand: deal.brand,
@@ -351,7 +352,7 @@ function App() {
       </nav>
 
       <main className="main-content">
-        {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} onEditDeal={(deal) => {
+        {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} teamUsers={teamUsers} onEditDeal={(deal) => {
           setCurrentPage('deals')
         }} />}
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
@@ -1049,7 +1050,7 @@ function LoginPage({ onLogin }) {
   )
 }
 
-function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
+function Dashboard({ deals, contacts, isAdmin, onEditDeal, teamUsers = [] }) {
   const [dateFilter, setDateFilter] = useState('all')
   const [viewType, setViewType] = useState('company')
   const [expandedOwners, setExpandedOwners] = useState(new Set())
@@ -1069,15 +1070,19 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   }
 
   const ownerMetrics = {}
+  const teamMemberNames = teamUsers.map(u => u.name)
   filteredDeals.forEach(deal => {
     const owner = deal.dealOwnerName || 'Unassigned'
-    if (!ownerMetrics[owner]) {
-      ownerMetrics[owner] = { deals: 0, revenue: 0, profit: 0 }
-    }
-    ownerMetrics[owner].deals += 1
-    if (isAdmin) {
-      ownerMetrics[owner].revenue += (deal.feeCharged || 0)
-      ownerMetrics[owner].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
+    // Only include current team members
+    if (owner === 'Unassigned' || teamMemberNames.includes(owner)) {
+      if (!ownerMetrics[owner]) {
+        ownerMetrics[owner] = { deals: 0, revenue: 0, profit: 0 }
+      }
+      ownerMetrics[owner].deals += 1
+      if (isAdmin) {
+        ownerMetrics[owner].revenue += (deal.feeCharged || 0)
+        ownerMetrics[owner].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
+      }
     }
   })
 
