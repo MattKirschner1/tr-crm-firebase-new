@@ -373,8 +373,8 @@ function App() {
         }} />}
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
-        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
-        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} />}
+        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} />}
+        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} />}
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
@@ -2517,11 +2517,11 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '20px', minHeight: '600px' }}>
+      <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '20px', minHeight: '600px' }}>
         {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Offer Submitted', 'Offer Accepted', 'Contract Signed', 'Closed Won', 'Closed Lost'].map(status => {
           const statusDeals = filteredDeals.filter(d => d.status === status)
           return (
-            <div key={status} style={{ backgroundColor: 'var(--gray-50)', borderRadius: '8px', padding: '16px', border: '1px solid var(--gray-300)', minWidth: '300px', flex: '0 0 300px' }}>
+            <div key={status} style={{ backgroundColor: 'var(--gray-50)', borderRadius: '8px', padding: '16px', border: '1px solid var(--gray-300)', minWidth: '280px', flex: '0 0 280px' }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>{status} ({statusDeals.length})</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto' }}>
                 {statusDeals.map(deal => (
@@ -2680,6 +2680,7 @@ function ContactsPage({ contacts, user, onReload, isAdmin, exportContactsAsCSV }
     company: '',
     email: '',
     phone: '',
+    socialHandle: '',
     notes: ''
   })
 
@@ -2703,7 +2704,7 @@ function ContactsPage({ contacts, user, onReload, isAdmin, exportContactsAsCSV }
   }
 
   const resetForm = () => {
-    setFormData({ name: '', type: '', title: '', company: '', email: '', phone: '', notes: '' })
+    setFormData({ name: '', type: '', title: '', company: '', email: '', phone: '', socialHandle: '', notes: '' })
     setEditingId(null)
     setShowForm(false)
   }
@@ -2910,6 +2911,12 @@ function ContactsPage({ contacts, user, onReload, isAdmin, exportContactsAsCSV }
                   <label>Phone</label>
                   <input type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                 </div>
+                {formData.type === 'Brand' && (
+                  <div className="form-group">
+                    <label>Brand Social Handle</label>
+                    <input type="text" value={formData.socialHandle} onChange={(e) => setFormData({...formData, socialHandle: e.target.value})} placeholder="@brandname" />
+                  </div>
+                )}
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Notes</label>
                   <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} style={{ minHeight: '100px', resize: 'vertical' }} />
@@ -2960,6 +2967,12 @@ function ContactsPage({ contacts, user, onReload, isAdmin, exportContactsAsCSV }
                       <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: 'bold' }}>Company</p>
                       <p style={{ margin: '0', fontSize: '14px' }}>{contact.company || '-'}</p>
                     </div>
+                    {contact.type === 'Brand' && contact.socialHandle && (
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: 'bold' }}>Social Handle</p>
+                        <p style={{ margin: '0', fontSize: '14px' }}>{contact.socialHandle}</p>
+                      </div>
+                    )}
                   </div>
                   {contact.notes && (
                     <div style={{ marginBottom: '16px' }}>
@@ -3721,7 +3734,7 @@ function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getCo
   )
 }
 
-function FileSearchPage({ deals, downloadFile, exportDocuments, user }) {
+function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients }) {
   const [fileSearch, setFileSearch] = useState('')
   const [expandedDeals, setExpandedDeals] = useState({})
 
@@ -3750,6 +3763,27 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user }) {
       }
     }
   })
+
+  // Also include PR client contracts
+  if (prClients) {
+    prClients.forEach(client => {
+      if (client.contracts && client.contracts.length > 0) {
+        const contractKey = `pr_${client.id}`
+        const contractFiles = client.contracts.map(contract => ({
+          name: contract.fileName,
+          size: contract.fileData ? contract.fileData.length : 0,
+          dataUrl: contract.fileData,
+          uploadedBy: user.email
+        }))
+        dealFilesMap[contractKey] = {
+          dealName: `${client.clientName} (PR Client)`,
+          talent: 'PR Contract',
+          dealStatus: 'Active',
+          files: contractFiles
+        }
+      }
+    })
+  }
 
   // Filter deals and files based on search
   const filteredDeals = Object.entries(dealFilesMap).filter(([dealId, dealData]) => {
@@ -3794,7 +3828,7 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user }) {
       <div style={{ marginBottom: '24px' }}>
         <input
           type="text"
-          placeholder="Search files by name, deal, or talent..."
+          placeholder="Search files by name, deal, client, talent, or contract..."
           value={fileSearch}
           onChange={(e) => setFileSearch(e.target.value)}
           style={{ width: '100%', padding: '12px 16px', fontSize: '14px', border: '1px solid var(--gray-300)', borderRadius: '6px', boxSizing: 'border-box' }}
@@ -4426,14 +4460,21 @@ function PRClientsPage({ prClients, setPrClients, user }) {
                   </button>
                 </div>
               </div>
-              {client.accountOwners && client.accountOwners.length > 0 && (
+              {client.accountOwners && client.accountOwners.filter(o => o.name && o.email).length > 0 && (
                 <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px', marginBottom: '12px' }}>
                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '600' }}>Account Owners:</p>
-                  {client.accountOwners.map((owner, idx) => (
-                    <p key={idx} style={{ margin: '2px 0', fontSize: '11px', color: 'var(--gray-600)' }}>
-                      • {owner.name} ({owner.email})
-                    </p>
+                  {client.accountOwners.filter(o => o.name && o.email).map((owner, idx) => (
+                    <div key={idx}>
+                      <p style={{ margin: '2px 0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                        • {owner.name} ({owner.email})
+                      </p>
+                    </div>
                   ))}
+                  {(client.contractStartDate || client.contractEndDate) && (
+                    <p style={{ margin: '6px 0 0 0', fontSize: '10px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                      Contract: {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString() : 'N/A'} to {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString() : 'N/A'}
+                    </p>
+                  )}
                 </div>
               )}
               {client.contracts && client.contracts.length > 0 && (
@@ -4478,7 +4519,7 @@ function PRDashboardPage({ prClients }) {
           </p>
         </div>
         <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
-          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Average Monthly</p>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Average Per Client</p>
           <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
             ${prClients.length > 0 ? (totalMonthly / prClients.length).toFixed(2) : '0.00'}
           </p>
@@ -4515,6 +4556,7 @@ function PRContractAlertsPage({ prClients }) {
           alerts.push({
             clientName: client.clientName,
             contractName: 'Contract Term',
+            startDate: client.contractStartDate,
             endDate: client.contractEndDate,
             daysUntilExpiration,
             accountOwners: client.accountOwners || [],
@@ -4524,6 +4566,7 @@ function PRContractAlertsPage({ prClients }) {
           alerts.push({
             clientName: client.clientName,
             contractName: 'Contract Term',
+            startDate: client.contractStartDate,
             endDate: client.contractEndDate,
             daysUntilExpiration,
             accountOwners: client.accountOwners || [],
@@ -4544,6 +4587,7 @@ function PRContractAlertsPage({ prClients }) {
               alerts.push({
                 clientName: client.clientName,
                 contractName: contract.fileName,
+                startDate: contract.startDate,
                 endDate: contract.endDate,
                 daysUntilExpiration,
                 accountOwners: client.accountOwners || [],
@@ -4553,6 +4597,7 @@ function PRContractAlertsPage({ prClients }) {
               alerts.push({
                 clientName: client.clientName,
                 contractName: contract.fileName,
+                startDate: contract.startDate,
                 endDate: contract.endDate,
                 daysUntilExpiration,
                 accountOwners: client.accountOwners || [],
@@ -4611,9 +4656,14 @@ function PRContractAlertsPage({ prClients }) {
                   <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>
                     {alert.clientName}
                   </p>
-                  <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '12px', color: 'var(--gray-600)' }}>
                     📄 {alert.contractName}
                   </p>
+                  {(alert.startDate || alert.endDate) && (
+                    <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: 'var(--gray-500)' }}>
+                      {alert.startDate ? new Date(alert.startDate).toLocaleDateString() : 'N/A'} to {alert.endDate ? new Date(alert.endDate).toLocaleDateString() : 'N/A'}
+                    </p>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{
@@ -4630,10 +4680,10 @@ function PRContractAlertsPage({ prClients }) {
                 </div>
               </div>
 
-              {alert.accountOwners && alert.accountOwners.length > 0 && (
+              {alert.accountOwners && alert.accountOwners.filter(o => o.name && o.email).length > 0 && (
                 <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '4px', marginTop: '12px', borderTop: `2px solid ${alert.isExpired ? '#fca5a5' : alert.daysUntilExpiration <= 7 ? '#fecaca' : '#fcd34d'}` }}>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Account Owners to Alert:</p>
-                  {alert.accountOwners.map((owner, oIdx) => (
+                  <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: '600', color: 'var(--gray-600)' }}>Notify Team:</p>
+                  {alert.accountOwners.filter(o => o.name && o.email).map((owner, oIdx) => (
                     <p key={oIdx} style={{ margin: '2px 0', fontSize: '10px', color: 'var(--gray-600)' }}>
                       • {owner.name} ({owner.email})
                     </p>
