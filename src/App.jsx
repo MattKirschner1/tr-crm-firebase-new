@@ -373,8 +373,8 @@ function App() {
         }} />}
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
-        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} />}
-        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} />}
+        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} isPRSearch={false} />}
+        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} isPRSearch={true} />}
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
@@ -2517,11 +2517,11 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '20px', minHeight: '600px' }}>
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '20px', minHeight: '600px' }}>
         {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Offer Submitted', 'Offer Accepted', 'Contract Signed', 'Closed Won', 'Closed Lost'].map(status => {
           const statusDeals = filteredDeals.filter(d => d.status === status)
           return (
-            <div key={status} style={{ backgroundColor: 'var(--gray-50)', borderRadius: '8px', padding: '16px', border: '1px solid var(--gray-300)', minWidth: '280px', flex: '0 0 280px' }}>
+            <div key={status} style={{ backgroundColor: 'var(--gray-50)', borderRadius: '8px', padding: '12px', border: '1px solid var(--gray-300)', minWidth: '240px', flex: '0 0 240px' }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>{status} ({statusDeals.length})</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px', overflowY: 'auto' }}>
                 {statusDeals.map(deal => (
@@ -3734,38 +3734,42 @@ function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getCo
   )
 }
 
-function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients }) {
+function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients, isPRSearch }) {
   const [fileSearch, setFileSearch] = useState('')
   const [expandedDeals, setExpandedDeals] = useState({})
 
   // Group files by deal
   const dealFilesMap = {}
   const ADMIN_EMAIL = 'matt@talentresources.com'
-  deals.forEach(deal => {
-    if (deal.fileAttachments && deal.fileAttachments.length > 0) {
-      const dealKey = deal.id
-      const visibleFiles = deal.fileAttachments.filter(file => {
-        if (file.uploadedBy === ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
-          return false
-        }
-        return true
-      })
-      if (visibleFiles.length > 0) {
-        dealFilesMap[dealKey] = {
-          dealName: deal.brand || 'Unknown Brand',
-          talent: deal.talent || 'Unknown Talent',
-          dealStatus: deal.status || 'Unknown',
-          files: visibleFiles.map(file => ({
-            ...file,
-            dealId: deal.id
-          }))
+
+  // Only include talent deals if NOT a PR search
+  if (!isPRSearch) {
+    deals.forEach(deal => {
+      if (deal.fileAttachments && deal.fileAttachments.length > 0) {
+        const dealKey = deal.id
+        const visibleFiles = deal.fileAttachments.filter(file => {
+          if (file.uploadedBy === ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
+            return false
+          }
+          return true
+        })
+        if (visibleFiles.length > 0) {
+          dealFilesMap[dealKey] = {
+            dealName: deal.brand || 'Unknown Brand',
+            talent: deal.talent || 'Unknown Talent',
+            dealStatus: deal.status || 'Unknown',
+            files: visibleFiles.map(file => ({
+              ...file,
+              dealId: deal.id
+            }))
+          }
         }
       }
-    }
-  })
+    })
+  }
 
-  // Also include PR client contracts
-  if (prClients) {
+  // Only include PR client contracts if this IS a PR search
+  if (isPRSearch && prClients) {
     prClients.forEach(client => {
       if (client.contracts && client.contracts.length > 0) {
         const contractKey = `pr_${client.id}`
@@ -3944,6 +3948,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
   const [showForm, setShowForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [expandedClients, setExpandedClients] = useState({})
   const [teamUsers, setTeamUsers] = useState([])
   const [ownerSearches, setOwnerSearches] = useState({})
   const [showOwnerSuggestions, setShowOwnerSuggestions] = useState({})
@@ -4412,86 +4417,120 @@ function PRClientsPage({ prClients, setPrClients, user }) {
           {prClients.length === 0 ? 'No clients yet. Add one to get started.' : 'No clients match your search.'}
         </p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-          {filteredClients.map((client) => (
-            <div key={client.id} style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>{client.clientName}</p>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)' }}>
-                    Contact: {client.clientContactName} | {client.clientContactEmail} | {client.clientContactPhone}
-                  </p>
-                  <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>
-                    Monthly Fee: ${client.monthlyFee?.toFixed(2) || '0.00'}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+          {filteredClients.map((client) => {
+            const isExpanded = expandedClients[client.id]
+            return (
+              <div key={client.id} style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', overflow: 'hidden' }}>
+                <div
+                  onClick={() => setExpandedClients({ ...expandedClients, [client.id]: !isExpanded })}
+                  style={{
+                    padding: '14px 16px',
+                    backgroundColor: 'var(--gray-50)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    userSelect: 'none'
+                  }}
+                >
+                  <p style={{ margin: '0', fontWeight: '600', fontSize: '14px' }}>
+                    {isExpanded ? '▼' : '▶'} {client.clientName}
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => {
-                      setFormData(client)
-                      setEditingId(client.id)
-                      setShowForm(true)
-                    }}
-                    style={{
-                      background: 'var(--primary)',
-                      color: 'white',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClient(client.id)}
-                    style={{
-                      background: '#ff6b6b',
-                      color: 'white',
-                      border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
+
+                {isExpanded && (
+                  <div style={{ padding: '16px', borderTop: '1px solid var(--gray-300)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: 'bold' }}>Contact Name</p>
+                        <p style={{ margin: '0', fontSize: '14px' }}>{client.clientContactName || '-'}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: 'bold' }}>Email</p>
+                        <p style={{ margin: '0', fontSize: '14px' }}>{client.clientContactEmail || '-'}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: 'bold' }}>Phone</p>
+                        <p style={{ margin: '0', fontSize: '14px' }}>{client.clientContactPhone || '-'}</p>
+                      </div>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: 'bold' }}>Monthly Fee</p>
+                        <p style={{ margin: '0', fontSize: '14px' }}>${client.monthlyFee?.toFixed(2) || '0.00'}</p>
+                      </div>
+                    </div>
+
+                    {client.accountOwners && client.accountOwners.filter(o => o.name && o.email).length > 0 && (
+                      <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--gray-300)' }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600' }}>Account Owners</p>
+                        {client.accountOwners.filter(o => o.name && o.email).map((owner, idx) => (
+                          <p key={idx} style={{ margin: '4px 0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                            • {owner.name} ({owner.email})
+                          </p>
+                        ))}
+                        {(client.contractStartDate || client.contractEndDate) && (
+                          <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                            Contract: {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString() : 'N/A'} to {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString() : 'N/A'}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {client.contracts && client.contracts.length > 0 && (
+                      <div style={{ marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px solid var(--gray-300)' }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600' }}>Contracts</p>
+                        {client.contracts.map((contract, idx) => (
+                          <div key={idx} style={{ marginBottom: '8px', paddingLeft: '12px' }}>
+                            <p style={{ margin: '0', fontSize: '12px', fontWeight: '500' }}>📄 {contract.fileName}</p>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                              {contract.startDate ? new Date(contract.startDate).toLocaleDateString() : 'No start'} to {contract.endDate ? new Date(contract.endDate).toLocaleDateString() : 'No end'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setFormData(client)
+                          setEditingId(client.id)
+                          setShowForm(true)
+                        }}
+                        style={{
+                          background: 'var(--primary)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClient(client.id)}
+                        style={{
+                          background: '#ff6b6b',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 16px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {client.accountOwners && client.accountOwners.filter(o => o.name && o.email).length > 0 && (
-                <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px', marginBottom: '12px' }}>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '600' }}>Account Owners:</p>
-                  {client.accountOwners.filter(o => o.name && o.email).map((owner, idx) => (
-                    <div key={idx}>
-                      <p style={{ margin: '2px 0', fontSize: '11px', color: 'var(--gray-600)' }}>
-                        • {owner.name} ({owner.email})
-                      </p>
-                    </div>
-                  ))}
-                  {(client.contractStartDate || client.contractEndDate) && (
-                    <p style={{ margin: '6px 0 0 0', fontSize: '10px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
-                      Contract: {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString() : 'N/A'} to {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString() : 'N/A'}
-                    </p>
-                  )}
-                </div>
-              )}
-              {client.contracts && client.contracts.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '12px' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: '600' }}>Contracts:</p>
-                  {client.contracts.map((contract, idx) => (
-                    <div key={idx} style={{ fontSize: '11px', color: 'var(--gray-600)', marginBottom: '6px', paddingLeft: '12px' }}>
-                      <p style={{ margin: '0', fontWeight: '500' }}>📄 {contract.fileName}</p>
-                      <p style={{ margin: '2px 0 0 0', fontSize: '10px' }}>
-                        {contract.startDate ? new Date(contract.startDate).toLocaleDateString() : 'No start'} to {contract.endDate ? new Date(contract.endDate).toLocaleDateString() : 'No end'}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
