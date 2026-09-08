@@ -371,12 +371,20 @@ function App() {
             <span>🎪 Sponsorships</span>
           </button>
           {expandedSections.sponsorships && (
-            <button
-              className={`nav-item ${currentPage === 'sponsorships' ? 'active' : ''}`}
-              onClick={() => { setCurrentPage('sponsorships'); setMenuOpen(false) }}
-            >
-              📋 <span>Sponsorships Board</span>
-            </button>
+            <>
+              <button
+                className={`nav-item ${currentPage === 'sponsorships' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('sponsorships'); setMenuOpen(false) }}
+              >
+                📋 <span>Sponsorships Board</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'sponsorships-filesearch' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('sponsorships-filesearch'); setMenuOpen(false) }}
+              >
+                🔍 <span>File Search</span>
+              </button>
+            </>
           )}
 
           {/* SOCIAL MEDIA MANAGEMENT SECTION */}
@@ -389,12 +397,20 @@ function App() {
             <span>📱 Social Media</span>
           </button>
           {expandedSections.socialmedia && (
-            <button
-              className={`nav-item ${currentPage === 'socialmedia' ? 'active' : ''}`}
-              onClick={() => { setCurrentPage('socialmedia'); setMenuOpen(false) }}
-            >
-              📊 <span>Campaigns</span>
-            </button>
+            <>
+              <button
+                className={`nav-item ${currentPage === 'socialmedia' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('socialmedia'); setMenuOpen(false) }}
+              >
+                📊 <span>Campaigns</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'socialmedia-filesearch' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('socialmedia-filesearch'); setMenuOpen(false) }}
+              >
+                🔍 <span>File Search</span>
+              </button>
+            </>
           )}
 
           {/* SEPARATE SECTION - Contacts, Team, Usage */}
@@ -451,7 +467,9 @@ function App() {
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
         {currentPage === 'sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
+        {currentPage === 'sponsorships-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} sponsorships={sponsorships} isPRSearch={false} />}
         {currentPage === 'socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
+        {currentPage === 'socialmedia-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} campaigns={socialMediaCampaigns} isPRSearch={false} />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
         {currentPage === 'settings' && <AccountSettingsPage user={user} onUpdate={() => {}} />}
