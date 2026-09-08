@@ -55,7 +55,7 @@ function App() {
 
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false })
+  const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false, sponsorships: false, socialmedia: false })
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
 
@@ -353,24 +353,48 @@ function App() {
                 ⏰ <span>Contract Alerts</span>
               </button>
               <button
-                className={`nav-item ${currentPage === 'pr-sponsorships' ? 'active' : ''}`}
-                onClick={() => { setCurrentPage('pr-sponsorships'); setMenuOpen(false) }}
-              >
-                🎪 <span>Sponsorships</span>
-              </button>
-              <button
-                className={`nav-item ${currentPage === 'pr-socialmedia' ? 'active' : ''}`}
-                onClick={() => { setCurrentPage('pr-socialmedia'); setMenuOpen(false) }}
-              >
-                📱 <span>Social Media</span>
-              </button>
-              <button
                 className={`nav-item ${currentPage === 'pr-filesearch' ? 'active' : ''}`}
                 onClick={() => { setCurrentPage('pr-filesearch'); setMenuOpen(false) }}
               >
                 🔍 <span>File Search</span>
               </button>
             </>
+          )}
+
+          {/* SPONSORSHIPS SECTION */}
+          <button
+            className="nav-section-header"
+            onClick={() => setExpandedSections({ ...expandedSections, sponsorships: !expandedSections.sponsorships })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: '600', width: '100%', marginTop: '8px' }}
+          >
+            <span>{expandedSections.sponsorships ? '▼' : '▶'}</span>
+            <span>🎪 Sponsorships</span>
+          </button>
+          {expandedSections.sponsorships && (
+            <button
+              className={`nav-item ${currentPage === 'sponsorships' ? 'active' : ''}`}
+              onClick={() => { setCurrentPage('sponsorships'); setMenuOpen(false) }}
+            >
+              📋 <span>Sponsorships Board</span>
+            </button>
+          )}
+
+          {/* SOCIAL MEDIA MANAGEMENT SECTION */}
+          <button
+            className="nav-section-header"
+            onClick={() => setExpandedSections({ ...expandedSections, socialmedia: !expandedSections.socialmedia })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: '600', width: '100%', marginTop: '8px' }}
+          >
+            <span>{expandedSections.socialmedia ? '▼' : '▶'}</span>
+            <span>📱 Social Media</span>
+          </button>
+          {expandedSections.socialmedia && (
+            <button
+              className={`nav-item ${currentPage === 'socialmedia' ? 'active' : ''}`}
+              onClick={() => { setCurrentPage('socialmedia'); setMenuOpen(false) }}
+            >
+              📊 <span>Campaigns</span>
+            </button>
           )}
 
           {/* SEPARATE SECTION - Contacts, Team, Usage */}
@@ -426,8 +450,8 @@ function App() {
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
-        {currentPage === 'pr-sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
-        {currentPage === 'pr-socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
+        {currentPage === 'sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
+        {currentPage === 'socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
         {currentPage === 'settings' && <AccountSettingsPage user={user} onUpdate={() => {}} />}
