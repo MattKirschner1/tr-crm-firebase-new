@@ -5,6 +5,7 @@ import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, o
 import * as XLSX from 'xlsx'
 
 const ADMIN_EMAIL = 'matt@talentresources.com'
+const APP_VERSION = '2.0' // Update this to force cache refresh
 
 const DEAL_STATUSES = [
   'Qualified Lead',
@@ -49,6 +50,8 @@ function App() {
   const [deals, setDeals] = useState([])
   const [contacts, setContacts] = useState([])
   const [prClients, setPrClients] = useState([])
+  const [sponsorships, setSponsorships] = useState([])
+  const [socialMediaCampaigns, setSocialMediaCampaigns] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -57,6 +60,15 @@ function App() {
   const [userProfile, setUserProfile] = useState(null)
 
   useEffect(() => {
+    // Check for app version updates
+    const storedVersion = localStorage.getItem('appVersion')
+    if (storedVersion && storedVersion !== APP_VERSION) {
+      localStorage.setItem('appVersion', APP_VERSION)
+      window.location.reload()
+    } else if (!storedVersion) {
+      localStorage.setItem('appVersion', APP_VERSION)
+    }
+
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser)
       if (currentUser) {
@@ -65,6 +77,8 @@ function App() {
         const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
+        loadSponsorships()
+        loadSocialMediaCampaigns()
 
         // Track last login and check profile completion
         try {
@@ -145,6 +159,28 @@ function App() {
       setPrClients(clients)
     } catch (error) {
       console.error('Error loading PR clients:', error)
+    }
+  }
+
+  const loadSponsorships = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'sponsorships'))
+      const sponsorships = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      sponsorships.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      setSponsorships(sponsorships)
+    } catch (error) {
+      console.error('Error loading sponsorships:', error)
+    }
+  }
+
+  const loadSocialMediaCampaigns = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'socialMediaCampaigns'))
+      const campaigns = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      campaigns.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      setSocialMediaCampaigns(campaigns)
+    } catch (error) {
+      console.error('Error loading social media campaigns:', error)
     }
   }
 
@@ -317,6 +353,18 @@ function App() {
                 ⏰ <span>Contract Alerts</span>
               </button>
               <button
+                className={`nav-item ${currentPage === 'pr-sponsorships' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('pr-sponsorships'); setMenuOpen(false) }}
+              >
+                🎪 <span>Sponsorships</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'pr-socialmedia' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('pr-socialmedia'); setMenuOpen(false) }}
+              >
+                📱 <span>Social Media</span>
+              </button>
+              <button
                 className={`nav-item ${currentPage === 'pr-filesearch' ? 'active' : ''}`}
                 onClick={() => { setCurrentPage('pr-filesearch'); setMenuOpen(false) }}
               >
@@ -378,6 +426,8 @@ function App() {
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
+        {currentPage === 'pr-sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
+        {currentPage === 'pr-socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
         {currentPage === 'settings' && <AccountSettingsPage user={user} onUpdate={() => {}} />}
@@ -3961,6 +4011,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
     accountOwners: [{ name: '', email: '' }],
     contractStartDate: '',
     contractEndDate: '',
+    autoRenewal: false,
     contracts: []
   })
   const contractFileInputRef = React.useRef(null)
@@ -4020,6 +4071,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
         accountOwners: [{ name: '', email: '' }],
         contractStartDate: '',
         contractEndDate: '',
+        autoRenewal: false,
         contracts: []
       })
       setEditingId(null)
@@ -4092,6 +4144,7 @@ function PRClientsPage({ prClients, setPrClients, user }) {
               accountOwners: [{ name: '', email: '' }],
               contractStartDate: '',
               contractEndDate: '',
+              autoRenewal: false,
               contracts: []
             })
           }}
@@ -4309,6 +4362,17 @@ function PRClientsPage({ prClients, setPrClients, user }) {
               </div>
             </div>
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <input
+                type="checkbox"
+                id="autoRenewal"
+                checked={formData.autoRenewal}
+                onChange={(e) => setFormData({ ...formData, autoRenewal: e.target.checked })}
+                style={{ cursor: 'pointer' }}
+              />
+              <label htmlFor="autoRenewal" style={{ fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>Auto-Renewal</label>
+            </div>
+
             <input
               ref={contractFileInputRef}
               type="file"
@@ -4469,9 +4533,16 @@ function PRClientsPage({ prClients, setPrClients, user }) {
                           </p>
                         ))}
                         {(client.contractStartDate || client.contractEndDate) && (
-                          <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
-                            Contract: {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString() : 'N/A'} to {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString() : 'N/A'}
-                          </p>
+                          <>
+                            <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--gray-500)', fontStyle: 'italic' }}>
+                              Contract: {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString() : 'N/A'} to {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString() : 'N/A'}
+                            </p>
+                            {client.autoRenewal && (
+                              <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--success)', fontWeight: '600' }}>
+                                ✓ Auto-Renewal Enabled
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -4807,6 +4878,539 @@ function ProfileCompletionModal({ user, onSave }) {
             {loading ? 'Saving...' : 'Save'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onReload, downloadFile }) {
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [expandedSponsors, setExpandedSponsors] = useState(new Set())
+  const [expandedDeliverables, setExpandedDeliverables] = useState({})
+  const [formData, setFormData] = useState({
+    sponsorName: '',
+    sponsorshipType: { event: false, branded: false },
+    eventName: '',
+    eventDescription: '',
+    entertainmentProperty: '',
+    status: 'Qualified Lead',
+    deliverables: [],
+    deliverableDetails: {},
+    feePaidToTR: 0,
+    feePaidToEvent: 0,
+    feePaidToProperty: 0,
+    otherCosts: 0,
+    sponsorOwnerEmail: user.email,
+    sponsorOwnerName: user.displayName || 'User',
+    fileAttachments: []
+  })
+  const fileInputRef = React.useRef(null)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const dataToSave = {
+        ...formData,
+        feePaidToTR: parseFloat(formData.feePaidToTR),
+        feePaidToEvent: parseFloat(formData.feePaidToEvent),
+        feePaidToProperty: parseFloat(formData.feePaidToProperty),
+        otherCosts: parseFloat(formData.otherCosts),
+        deliverables: Array.isArray(formData.deliverables) ? formData.deliverables : []
+      }
+
+      if (editingId) {
+        await updateDoc(doc(db, 'sponsorships', editingId), dataToSave)
+      } else {
+        await addDoc(collection(db, 'sponsorships'), {
+          ...dataToSave,
+          createdAt: new Date()
+        })
+      }
+      onReload()
+      resetForm()
+    } catch (error) {
+      alert('Error saving sponsorship: ' + error.message)
+    }
+  }
+
+  const handleFileUpload = (e) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newFiles = Array.from(files).map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      addedAt: new Date(),
+      dataUrl: null
+    }))
+
+    let processedCount = 0
+    newFiles.forEach((fileInfo, idx) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        newFiles[idx].dataUrl = event.target.result
+        processedCount++
+        if (processedCount === newFiles.length) {
+          setFormData({
+            ...formData,
+            fileAttachments: [...(formData.fileAttachments || []), ...newFiles]
+          })
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+          }
+        }
+      }
+      reader.readAsDataURL(files[idx])
+    })
+  }
+
+  const removeFile = (index) => {
+    const newFiles = formData.fileAttachments.filter((_, i) => i !== index)
+    setFormData({...formData, fileAttachments: newFiles})
+  }
+
+  const resetForm = () => {
+    setFormData({
+      sponsorName: '',
+      sponsorshipType: { event: false, branded: false },
+      eventName: '',
+      eventDescription: '',
+      entertainmentProperty: '',
+      status: 'Qualified Lead',
+      deliverables: [],
+      deliverableDetails: {},
+      feePaidToTR: 0,
+      feePaidToEvent: 0,
+      feePaidToProperty: 0,
+      otherCosts: 0,
+      sponsorOwnerEmail: user.email,
+      sponsorOwnerName: user.displayName || 'User',
+      fileAttachments: []
+    })
+    setEditingId(null)
+    setShowForm(false)
+    setExpandedDeliverables({})
+  }
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Delete this sponsorship?')) {
+      try {
+        await deleteDoc(doc(db, 'sponsorships', id))
+        onReload()
+      } catch (error) {
+        alert('Error deleting sponsorship')
+      }
+    }
+  }
+
+  const toggleDeliverable = (deliverable) => {
+    const updated = Array.isArray(formData.deliverables) ? [...formData.deliverables] : []
+    if (updated.includes(deliverable)) {
+      updated.splice(updated.indexOf(deliverable), 1)
+    } else {
+      updated.push(deliverable)
+    }
+    setFormData({...formData, deliverables: updated})
+  }
+
+  const availableDeliverables = ['Social Posts', 'Event Signage', 'Product Placement', 'Media Coverage', 'Brand Integration', 'Other']
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>Sponsorships</h1>
+        <button onClick={() => { setShowForm(!showForm); resetForm() }} className="btn btn-primary">
+          {showForm ? 'Cancel' : '+ New Sponsorship'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
+          <h2>New Sponsorship</h2>
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Sponsor Name</label>
+                <input value={formData.sponsorName} onChange={(e) => setFormData({...formData, sponsorName: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                  {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Offer Submitted', 'Offer Accepted', 'Contract Signed', 'Closed Won', 'Closed Lost'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Sponsorship Type</label>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={formData.sponsorshipType.event} onChange={(e) => setFormData({...formData, sponsorshipType: {...formData.sponsorshipType, event: e.target.checked}})} />
+                  Event Sponsorship
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={formData.sponsorshipType.branded} onChange={(e) => setFormData({...formData, sponsorshipType: {...formData.sponsorshipType, branded: e.target.checked}})} />
+                  Branded Entertainment
+                </label>
+              </div>
+            </div>
+
+            {formData.sponsorshipType.event && (
+              <>
+                <div className="form-group">
+                  <label>Event Name</label>
+                  <input value={formData.eventName} onChange={(e) => setFormData({...formData, eventName: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Event Description</label>
+                  <textarea value={formData.eventDescription} onChange={(e) => setFormData({...formData, eventDescription: e.target.value})} style={{ minHeight: '80px' }} />
+                </div>
+              </>
+            )}
+
+            {formData.sponsorshipType.branded && (
+              <div className="form-group">
+                <label>Entertainment Property</label>
+                <input value={formData.entertainmentProperty} onChange={(e) => setFormData({...formData, entertainmentProperty: e.target.value})} />
+              </div>
+            )}
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Deliverables</label>
+              {availableDeliverables.map(d => (
+                <div key={d} style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={Array.isArray(formData.deliverables) && formData.deliverables.includes(d)} onChange={() => toggleDeliverable(d)} />
+                    {d}
+                  </label>
+                  {Array.isArray(formData.deliverables) && formData.deliverables.includes(d) && (
+                    <input placeholder={`Details for ${d}`} value={formData.deliverableDetails[d] || ''} onChange={(e) => setFormData({...formData, deliverableDetails: {...formData.deliverableDetails, [d]: e.target.value}})} style={{ width: '100%', marginTop: '6px', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Fee Paid to TR ($)</label>
+                <input type="number" value={formData.feePaidToTR} onChange={(e) => setFormData({...formData, feePaidToTR: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Fee Paid to Event ($)</label>
+                <input type="number" value={formData.feePaidToEvent} onChange={(e) => setFormData({...formData, feePaidToEvent: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Fee Paid to Property ($)</label>
+                <input type="number" value={formData.feePaidToProperty} onChange={(e) => setFormData({...formData, feePaidToProperty: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Other Costs ($)</label>
+                <input type="number" value={formData.otherCosts} onChange={(e) => setFormData({...formData, otherCosts: e.target.value})} />
+              </div>
+            </div>
+
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ marginBottom: '12px' }}>
+              Attach Files
+            </button>
+
+            {formData.fileAttachments && formData.fileAttachments.length > 0 && (
+              <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+                {formData.fileAttachments.map((file, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '6px' }}>
+                    <span>{file.name}</span>
+                    <button type="button" onClick={() => removeFile(idx)} className="btn btn-danger btn-small">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary">Save Sponsorship</button>
+          </form>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '20px', minHeight: '600px' }}>
+        {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Offer Submitted', 'Offer Accepted', 'Contract Signed', 'Closed Won', 'Closed Lost'].map(status => {
+          const statusSponsors = sponsorships.filter(s => s.status === status)
+          return (
+            <div key={status} style={{ backgroundColor: 'var(--gray-50)', borderRadius: '8px', padding: '12px', border: '1px solid var(--gray-300)', minWidth: '240px', flex: '0 0 240px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '12px', fontSize: '13px' }}>{status} ({statusSponsors.length})</div>
+              {statusSponsors.map(sponsor => (
+                <div key={sponsor.id} style={{ backgroundColor: 'white', border: '1px solid var(--gray-300)', borderRadius: '4px', padding: '8px', marginBottom: '8px', cursor: 'pointer' }} onClick={() => {
+                  setFormData(sponsor)
+                  setEditingId(sponsor.id)
+                  setShowForm(true)
+                }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '600' }}>{sponsor.sponsorName}</p>
+                  <p style={{ margin: '0', fontSize: '11px', color: 'var(--gray-600)' }}>${formatCurrency(sponsor.feePaidToTR || 0)} to TR</p>
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(sponsor.id) }} className="btn btn-danger btn-small" style={{ flex: 1 }}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, downloadFile }) {
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [expandedDeliverables, setExpandedDeliverables] = useState({})
+  const [formData, setFormData] = useState({
+    brandName: '',
+    platform: 'Instagram',
+    status: 'Qualified Lead',
+    deliverables: [],
+    deliverableDetails: {},
+    campaignBudget: 0,
+    campaignFee: 0,
+    startDate: '',
+    endDate: '',
+    campaignOwnerEmail: user.email,
+    campaignOwnerName: user.displayName || 'User',
+    notes: '',
+    fileAttachments: []
+  })
+  const fileInputRef = React.useRef(null)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const dataToSave = {
+        ...formData,
+        campaignBudget: parseFloat(formData.campaignBudget),
+        campaignFee: parseFloat(formData.campaignFee),
+        deliverables: Array.isArray(formData.deliverables) ? formData.deliverables : []
+      }
+
+      if (editingId) {
+        await updateDoc(doc(db, 'socialMediaCampaigns', editingId), dataToSave)
+      } else {
+        await addDoc(collection(db, 'socialMediaCampaigns'), {
+          ...dataToSave,
+          createdAt: new Date()
+        })
+      }
+      onReload()
+      resetForm()
+    } catch (error) {
+      alert('Error saving campaign: ' + error.message)
+    }
+  }
+
+  const handleFileUpload = (e) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newFiles = Array.from(files).map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      addedAt: new Date(),
+      dataUrl: null
+    }))
+
+    let processedCount = 0
+    newFiles.forEach((fileInfo, idx) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        newFiles[idx].dataUrl = event.target.result
+        processedCount++
+        if (processedCount === newFiles.length) {
+          setFormData({
+            ...formData,
+            fileAttachments: [...(formData.fileAttachments || []), ...newFiles]
+          })
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+          }
+        }
+      }
+      reader.readAsDataURL(files[idx])
+    })
+  }
+
+  const removeFile = (index) => {
+    const newFiles = formData.fileAttachments.filter((_, i) => i !== index)
+    setFormData({...formData, fileAttachments: newFiles})
+  }
+
+  const resetForm = () => {
+    setFormData({
+      brandName: '',
+      platform: 'Instagram',
+      status: 'Qualified Lead',
+      deliverables: [],
+      deliverableDetails: {},
+      campaignBudget: 0,
+      campaignFee: 0,
+      startDate: '',
+      endDate: '',
+      campaignOwnerEmail: user.email,
+      campaignOwnerName: user.displayName || 'User',
+      notes: '',
+      fileAttachments: []
+    })
+    setEditingId(null)
+    setShowForm(false)
+    setExpandedDeliverables({})
+  }
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Delete this campaign?')) {
+      try {
+        await deleteDoc(doc(db, 'socialMediaCampaigns', id))
+        onReload()
+      } catch (error) {
+        alert('Error deleting campaign')
+      }
+    }
+  }
+
+  const toggleDeliverable = (deliverable) => {
+    const updated = Array.isArray(formData.deliverables) ? [...formData.deliverables] : []
+    if (updated.includes(deliverable)) {
+      updated.splice(updated.indexOf(deliverable), 1)
+    } else {
+      updated.push(deliverable)
+    }
+    setFormData({...formData, deliverables: updated})
+  }
+
+  const availableDeliverables = ['Feed Posts', 'Stories', 'Reels', 'Hashtag Campaign', 'Community Management', 'Analytics Report', 'Other']
+  const platforms = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Twitter/X', 'Facebook', 'Threads']
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>Social Media Management</h1>
+        <button onClick={() => { setShowForm(!showForm); resetForm() }} className="btn btn-primary">
+          {showForm ? 'Cancel' : '+ New Campaign'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
+          <h2>New Campaign</h2>
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Brand Name</label>
+                <input value={formData.brandName} onChange={(e) => setFormData({...formData, brandName: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Platform</label>
+                <select value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})}>
+                  {platforms.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                  {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Offer Submitted', 'Offer Accepted', 'Contract Signed', 'Closed Won', 'Closed Lost'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Campaign Fee ($)</label>
+                <input type="number" value={formData.campaignFee} onChange={(e) => setFormData({...formData, campaignFee: e.target.value})} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Start Date</label>
+                <input type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>End Date</label>
+                <input type="date" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Deliverables</label>
+              {availableDeliverables.map(d => (
+                <div key={d} style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={Array.isArray(formData.deliverables) && formData.deliverables.includes(d)} onChange={() => toggleDeliverable(d)} />
+                    {d}
+                  </label>
+                  {Array.isArray(formData.deliverables) && formData.deliverables.includes(d) && (
+                    <input placeholder={`Details for ${d}`} value={formData.deliverableDetails[d] || ''} onChange={(e) => setFormData({...formData, deliverableDetails: {...formData.deliverableDetails, [d]: e.target.value}})} style={{ width: '100%', marginTop: '6px', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} style={{ minHeight: '80px' }} />
+            </div>
+
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ marginBottom: '12px' }}>
+              Attach Files
+            </button>
+
+            {formData.fileAttachments && formData.fileAttachments.length > 0 && (
+              <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+                {formData.fileAttachments.map((file, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '6px' }}>
+                    <span>{file.name}</span>
+                    <button type="button" onClick={() => removeFile(idx)} className="btn btn-danger btn-small">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary">Save Campaign</button>
+          </form>
+        </div>
+      )}
+
+      <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', overflow: 'hidden' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Brand</th>
+              <th>Platform</th>
+              <th>Status</th>
+              <th>Campaign Fee</th>
+              <th>Duration</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {campaigns && campaigns.length > 0 ? campaigns.map(campaign => (
+              <tr key={campaign.id}>
+                <td>{campaign.brandName}</td>
+                <td>{campaign.platform}</td>
+                <td>{campaign.status}</td>
+                <td>${formatCurrency(campaign.campaignFee || 0)}</td>
+                <td>{campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : 'N/A'} to {campaign.endDate ? new Date(campaign.endDate).toLocaleDateString() : 'N/A'}</td>
+                <td>
+                  <button onClick={() => { setFormData(campaign); setEditingId(campaign.id); setShowForm(true) }} className="btn btn-primary btn-small">Edit</button>
+                  <button onClick={() => handleDelete(campaign.id)} className="btn btn-danger btn-small">Delete</button>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colSpan="6" style={{ textAlign: 'center' }}>No campaigns yet</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
