@@ -4886,8 +4886,6 @@ function ProfileCompletionModal({ user, onSave }) {
 function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onReload, downloadFile }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [expandedSponsors, setExpandedSponsors] = useState(new Set())
-  const [expandedDeliverables, setExpandedDeliverables] = useState({})
   const [formData, setFormData] = useState({
     sponsorName: '',
     sponsorshipType: { event: false, branded: false },
@@ -4991,7 +4989,6 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
     })
     setEditingId(null)
     setShowForm(false)
-    setExpandedDeliverables({})
   }
 
   const handleDelete = async (id) => {
@@ -5164,7 +5161,6 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
 function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, downloadFile }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [expandedDeliverables, setExpandedDeliverables] = useState({})
   const [formData, setFormData] = useState({
     brandName: '',
     platform: 'Instagram',
@@ -5262,7 +5258,6 @@ function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, do
     })
     setEditingId(null)
     setShowForm(false)
-    setExpandedDeliverables({})
   }
 
   const handleDelete = async (id) => {
