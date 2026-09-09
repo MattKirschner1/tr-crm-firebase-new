@@ -5168,24 +5168,30 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
               ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-              <div className="form-group">
-                <label>Fee Paid to TR ($)</label>
-                <input type="number" value={formData.feePaidToTR} onChange={(e) => setFormData({...formData, feePaidToTR: e.target.value})} />
+            {(formData.sponsorshipType.event || formData.sponsorshipType.branded) && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div className="form-group">
+                  <label>Fee Paid to TR ($)</label>
+                  <input type="number" value={formData.feePaidToTR} onChange={(e) => setFormData({...formData, feePaidToTR: e.target.value})} />
+                </div>
+                {formData.sponsorshipType.event && (
+                  <div className="form-group">
+                    <label>Fee Paid to Event ($)</label>
+                    <input type="number" value={formData.feePaidToEvent} onChange={(e) => setFormData({...formData, feePaidToEvent: e.target.value})} />
+                  </div>
+                )}
+                {formData.sponsorshipType.branded && (
+                  <div className="form-group">
+                    <label>Fee Paid to Property ($)</label>
+                    <input type="number" value={formData.feePaidToProperty} onChange={(e) => setFormData({...formData, feePaidToProperty: e.target.value})} />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Other Costs ($)</label>
+                  <input type="number" value={formData.otherCosts} onChange={(e) => setFormData({...formData, otherCosts: e.target.value})} />
+                </div>
               </div>
-              <div className="form-group">
-                <label>Fee Paid to Event ($)</label>
-                <input type="number" value={formData.feePaidToEvent} onChange={(e) => setFormData({...formData, feePaidToEvent: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Fee Paid to Property ($)</label>
-                <input type="number" value={formData.feePaidToProperty} onChange={(e) => setFormData({...formData, feePaidToProperty: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Other Costs ($)</label>
-                <input type="number" value={formData.otherCosts} onChange={(e) => setFormData({...formData, otherCosts: e.target.value})} />
-              </div>
-            </div>
+            )}
 
             <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
             <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ marginBottom: '12px' }}>
