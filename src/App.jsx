@@ -461,15 +461,15 @@ function App() {
         }} />}
         {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
-        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} isPRSearch={false} />}
-        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} isPRSearch={true} />}
+        {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="talent" />}
+        {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="pr" />}
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'pr-dashboard' && <PRDashboardPage prClients={prClients} />}
         {currentPage === 'pr-alerts' && <PRContractAlertsPage prClients={prClients} />}
         {currentPage === 'sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
-        {currentPage === 'sponsorships-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} sponsorships={sponsorships} isPRSearch={false} />}
+        {currentPage === 'sponsorships-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} sponsorships={sponsorships} searchType="sponsorships" />}
         {currentPage === 'socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
-        {currentPage === 'socialmedia-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} campaigns={socialMediaCampaigns} isPRSearch={false} />}
+        {currentPage === 'socialmedia-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} campaigns={socialMediaCampaigns} searchType="socialmedia" />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
         {currentPage === 'settings' && <AccountSettingsPage user={user} onUpdate={() => {}} />}
@@ -3826,16 +3826,16 @@ function AgencyProfileView({ agencyName, deals, contacts, onBack, isAdmin, getCo
   )
 }
 
-function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients, isPRSearch }) {
+function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients, sponsorships, campaigns, searchType }) {
   const [fileSearch, setFileSearch] = useState('')
   const [expandedDeals, setExpandedDeals] = useState({})
 
-  // Group files by deal
-  const dealFilesMap = {}
+  // Group files by deal/item based on searchType
+  let dealFilesMap = {}
   const ADMIN_EMAIL = 'matt@talentresources.com'
 
-  // Only include talent deals if NOT a PR search
-  if (!isPRSearch) {
+  // Only populate based on searchType - no fallback to other divisions
+  if (searchType === 'talent' && deals && deals.length > 0) {
     deals.forEach(deal => {
       if (deal.fileAttachments && deal.fileAttachments.length > 0) {
         const dealKey = deal.id
@@ -3860,8 +3860,7 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
     })
   }
 
-  // Only include PR client contracts if this IS a PR search
-  if (isPRSearch && prClients) {
+  if (searchType === 'pr' && prClients && prClients.length > 0) {
     prClients.forEach(client => {
       if (client.contracts && client.contracts.length > 0) {
         const contractKey = `pr_${client.id}`
@@ -3876,6 +3875,42 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
           talent: 'PR Contract',
           dealStatus: 'Active',
           files: contractFiles
+        }
+      }
+    })
+  }
+
+  if (searchType === 'sponsorships' && sponsorships && sponsorships.length > 0) {
+    sponsorships.forEach(sponsorship => {
+      if (sponsorship.fileAttachments && sponsorship.fileAttachments.length > 0) {
+        const sponsorKey = sponsorship.id
+        const sponsorFiles = sponsorship.fileAttachments.map(file => ({
+          ...file,
+          sponsorId: sponsorship.id
+        }))
+        dealFilesMap[sponsorKey] = {
+          dealName: sponsorship.sponsorName || 'Unknown Sponsor',
+          talent: sponsorship.status || 'Unknown Status',
+          dealStatus: sponsorship.status || 'Unknown',
+          files: sponsorFiles
+        }
+      }
+    })
+  }
+
+  if (searchType === 'socialmedia' && campaigns && campaigns.length > 0) {
+    campaigns.forEach(campaign => {
+      if (campaign.fileAttachments && campaign.fileAttachments.length > 0) {
+        const campaignKey = campaign.id
+        const campaignFiles = campaign.fileAttachments.map(file => ({
+          ...file,
+          campaignId: campaign.id
+        }))
+        dealFilesMap[campaignKey] = {
+          dealName: campaign.clientName || campaign.brandName || 'Unknown',
+          talent: `${campaign.platform || campaign.contactName || 'Unknown'}`,
+          dealStatus: campaign.status || 'Unknown',
+          files: campaignFiles
         }
       }
     })
@@ -5060,7 +5095,7 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h1>Sponsorships</h1>
-        <button onClick={() => { setShowForm(!showForm); resetForm() }} className="btn btn-primary">
+        <button onClick={() => showForm ? resetForm() : setShowForm(true)} className="btn btn-primary">
           {showForm ? 'Cancel' : '+ New Sponsorship'}
         </button>
       </div>
@@ -5202,252 +5237,363 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
 
 function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, downloadFile }) {
   const [showForm, setShowForm] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({
-    brandName: '',
-    platform: 'Instagram',
-    status: 'Qualified Lead',
-    deliverables: [],
-    deliverableDetails: {},
-    campaignBudget: 0,
-    campaignFee: 0,
-    startDate: '',
-    endDate: '',
-    campaignOwnerEmail: user.email,
-    campaignOwnerName: user.displayName || 'User',
-    notes: '',
-    fileAttachments: []
+    clientName: '',
+    monthlyFee: '',
+    clientContactName: '',
+    clientContactEmail: '',
+    clientContactPhone: '',
+    accountOwners: [{ name: '', email: '' }],
+    contractStartDate: '',
+    contractEndDate: '',
+    autoRenewal: false,
+    contracts: []
   })
-  const fileInputRef = React.useRef(null)
+  const contractFileInputRef = React.useRef(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const filteredClients = campaigns.filter(client =>
+    client.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.clientContactName.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const handleAddClient = async () => {
+    if (!formData.clientName || !formData.monthlyFee) {
+      alert('Please fill in client name and monthly fee')
+      return
+    }
+
     try {
-      const dataToSave = {
-        ...formData,
-        campaignBudget: parseFloat(formData.campaignBudget),
-        campaignFee: parseFloat(formData.campaignFee),
-        deliverables: Array.isArray(formData.deliverables) ? formData.deliverables : []
-      }
-
       if (editingId) {
-        await updateDoc(doc(db, 'socialMediaCampaigns', editingId), dataToSave)
-      } else {
-        await addDoc(collection(db, 'socialMediaCampaigns'), {
-          ...dataToSave,
-          createdAt: new Date()
+        await updateDoc(doc(db, 'socialMediaCampaigns', editingId), {
+          ...formData,
+          monthlyFee: parseFloat(formData.monthlyFee),
+          updatedAt: new Date()
         })
+        setCampaigns(campaigns.map(c => c.id === editingId ? { id: editingId, ...formData, monthlyFee: parseFloat(formData.monthlyFee) } : c))
+      } else {
+        const docRef = await addDoc(collection(db, 'socialMediaCampaigns'), {
+          ...formData,
+          monthlyFee: parseFloat(formData.monthlyFee),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        setCampaigns([...campaigns, { id: docRef.id, ...formData, monthlyFee: parseFloat(formData.monthlyFee) }])
       }
-      onReload()
-      resetForm()
+      setFormData({
+        clientName: '',
+        monthlyFee: '',
+        clientContactName: '',
+        clientContactEmail: '',
+        clientContactPhone: '',
+        accountOwners: [{ name: '', email: '' }],
+        contractStartDate: '',
+        contractEndDate: '',
+        autoRenewal: false,
+        contracts: []
+      })
+      setEditingId(null)
+      setShowForm(false)
     } catch (error) {
-      alert('Error saving campaign: ' + error.message)
+      console.error('Error saving client:', error)
+      alert('Error saving client')
     }
   }
 
-  const handleFileUpload = (e) => {
+  const handleDeleteClient = async (id) => {
+    if (window.confirm('Delete this client?')) {
+      try {
+        await deleteDoc(doc(db, 'socialMediaCampaigns', id))
+        setCampaigns(campaigns.filter(c => c.id !== id))
+      } catch (error) {
+        console.error('Error deleting client:', error)
+      }
+    }
+  }
+
+  const handleContractFileUpload = (e) => {
     const files = e.target.files
     if (!files) return
 
-    const newFiles = Array.from(files).map(file => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      addedAt: new Date(),
-      dataUrl: null
-    }))
-
-    let processedCount = 0
-    newFiles.forEach((fileInfo, idx) => {
+    Array.from(files).forEach((file) => {
       const reader = new FileReader()
       reader.onload = (event) => {
-        newFiles[idx].dataUrl = event.target.result
-        processedCount++
-        if (processedCount === newFiles.length) {
-          setFormData({
-            ...formData,
-            fileAttachments: [...(formData.fileAttachments || []), ...newFiles]
-          })
-          if (fileInputRef.current) {
-            fileInputRef.current.value = ''
-          }
+        const newContract = {
+          id: Date.now().toString(),
+          name: file.name,
+          startDate: '',
+          endDate: '',
+          fileName: file.name,
+          fileData: event.target.result
         }
+        setFormData({
+          ...formData,
+          contracts: [...(formData.contracts || []), newContract]
+        })
       }
-      reader.readAsDataURL(files[idx])
+      reader.readAsDataURL(file)
     })
+    if (contractFileInputRef.current) {
+      contractFileInputRef.current.value = ''
+    }
   }
 
-  const removeFile = (index) => {
-    const newFiles = formData.fileAttachments.filter((_, i) => i !== index)
-    setFormData({...formData, fileAttachments: newFiles})
-  }
-
-  const resetForm = () => {
+  const removeContract = (contractId) => {
     setFormData({
-      brandName: '',
-      platform: 'Instagram',
-      status: 'Qualified Lead',
-      deliverables: [],
-      deliverableDetails: {},
-      campaignBudget: 0,
-      campaignFee: 0,
-      startDate: '',
-      endDate: '',
-      campaignOwnerEmail: user.email,
-      campaignOwnerName: user.displayName || 'User',
-      notes: '',
-      fileAttachments: []
+      ...formData,
+      contracts: formData.contracts.filter(c => c.id !== contractId)
     })
-    setEditingId(null)
-    setShowForm(false)
   }
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Delete this campaign?')) {
-      try {
-        await deleteDoc(doc(db, 'socialMediaCampaigns', id))
-        onReload()
-      } catch (error) {
-        alert('Error deleting campaign')
-      }
-    }
-  }
-
-  const toggleDeliverable = (deliverable) => {
-    const updated = Array.isArray(formData.deliverables) ? [...formData.deliverables] : []
-    if (updated.includes(deliverable)) {
-      updated.splice(updated.indexOf(deliverable), 1)
-    } else {
-      updated.push(deliverable)
-    }
-    setFormData({...formData, deliverables: updated})
-  }
-
-  const availableDeliverables = ['Feed Posts', 'Stories', 'Reels', 'Hashtag Campaign', 'Community Management', 'Analytics Report', 'Other']
-  const platforms = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn', 'Twitter/X', 'Facebook', 'Threads']
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Social Media Management</h1>
-        <button onClick={() => { setShowForm(!showForm); resetForm() }} className="btn btn-primary">
-          {showForm ? 'Cancel' : '+ New Campaign'}
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h1 style={{ margin: '0', fontSize: '24px', fontWeight: '700' }}>Current Clients</h1>
+        <button
+          onClick={() => {
+            setShowForm(!showForm)
+            setEditingId(null)
+            setFormData({
+              clientName: '',
+              monthlyFee: '',
+              clientContactName: '',
+              clientContactEmail: '',
+              clientContactPhone: '',
+              accountOwners: [{ name: '', email: '' }],
+              contractStartDate: '',
+              contractEndDate: '',
+              autoRenewal: false,
+              contracts: []
+            })
+          }}
+          style={{
+            background: 'var(--primary)',
+            color: 'white',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: '500'
+          }}
+        >
+          {showForm ? 'Cancel' : '+ Add Client'}
         </button>
       </div>
 
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
-          <h2>New Campaign</h2>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-              <div className="form-group">
-                <label>Brand Name</label>
-                <input value={formData.brandName} onChange={(e) => setFormData({...formData, brandName: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Platform</label>
-                <select value={formData.platform} onChange={(e) => setFormData({...formData, platform: e.target.value})}>
-                  {platforms.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Status</label>
-                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-                  {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Offer Submitted', 'Offer Accepted', 'Contract Signed', 'Closed Won', 'Closed Lost'].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Campaign Fee ($)</label>
-                <input type="number" value={formData.campaignFee} onChange={(e) => setFormData({...formData, campaignFee: e.target.value})} />
-              </div>
-            </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', marginBottom: '24px' }}>
+          <h2 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>
+            {editingId ? 'Edit Client' : 'New Client'}
+          </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-              <div className="form-group">
-                <label>Start Date</label>
-                <input type="date" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>End Date</label>
-                <input type="date" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Client Name</label>
+              <input
+                type="text"
+                value={formData.clientName}
+                onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="Client name"
+              />
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Monthly Fee ($)</label>
+              <input
+                type="number"
+                value={formData.monthlyFee}
+                onChange={(e) => setFormData({ ...formData, monthlyFee: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="0"
+              />
+            </div>
+          </div>
 
-            <div className="form-group" style={{ marginBottom: '16px' }}>
-              <label>Deliverables</label>
-              {availableDeliverables.map(d => (
-                <div key={d} style={{ marginBottom: '12px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={Array.isArray(formData.deliverables) && formData.deliverables.includes(d)} onChange={() => toggleDeliverable(d)} />
-                    {d}
-                  </label>
-                  {Array.isArray(formData.deliverables) && formData.deliverables.includes(d) && (
-                    <input placeholder={`Details for ${d}`} value={formData.deliverableDetails[d] || ''} onChange={(e) => setFormData({...formData, deliverableDetails: {...formData.deliverableDetails, [d]: e.target.value}})} style={{ width: '100%', marginTop: '6px', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }} />
-                  )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Contact Name</label>
+              <input
+                type="text"
+                value={formData.clientContactName}
+                onChange={(e) => setFormData({ ...formData, clientContactName: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="Contact name"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Contact Email</label>
+              <input
+                type="email"
+                value={formData.clientContactEmail}
+                onChange={(e) => setFormData({ ...formData, clientContactEmail: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+                placeholder="email@example.com"
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Contact Phone</label>
+            <input
+              type="tel"
+              value={formData.clientContactPhone}
+              onChange={(e) => setFormData({ ...formData, clientContactPhone: e.target.value })}
+              style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+              placeholder="(555) 123-4567"
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Contract Start Date</label>
+              <input
+                type="date"
+                value={formData.contractStartDate}
+                onChange={(e) => setFormData({ ...formData, contractStartDate: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>Contract End Date</label>
+              <input
+                type="date"
+                value={formData.contractEndDate}
+                onChange={(e) => setFormData({ ...formData, contractEndDate: e.target.value })}
+                style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+              <input
+                type="checkbox"
+                checked={formData.autoRenewal}
+                onChange={(e) => setFormData({ ...formData, autoRenewal: e.target.checked })}
+              />
+              Auto-Renewal
+            </label>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <input ref={contractFileInputRef} type="file" multiple onChange={handleContractFileUpload} style={{ display: 'none' }} />
+            <button type="button" onClick={() => contractFileInputRef.current?.click()} className="btn btn-secondary">
+              Attach Contracts
+            </button>
+          </div>
+
+          {formData.contracts && formData.contracts.length > 0 && (
+            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+              {formData.contracts.map((contract) => (
+                <div key={contract.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '6px' }}>
+                  <span>{contract.fileName}</span>
+                  <button type="button" onClick={() => removeContract(contract.id)} className="btn btn-danger btn-small">Remove</button>
                 </div>
               ))}
             </div>
+          )}
 
-            <div className="form-group">
-              <label>Notes</label>
-              <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} style={{ minHeight: '80px' }} />
-            </div>
-
-            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ marginBottom: '12px' }}>
-              Attach Files
-            </button>
-
-            {formData.fileAttachments && formData.fileAttachments.length > 0 && (
-              <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
-                {formData.fileAttachments.map((file, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '6px' }}>
-                    <span>{file.name}</span>
-                    <button type="button" onClick={() => removeFile(idx)} className="btn btn-danger btn-small">Remove</button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button type="submit" className="btn btn-primary">Save Campaign</button>
-          </form>
+          <button
+            onClick={handleAddClient}
+            style={{
+              background: 'var(--primary)',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Save Client
+          </button>
         </div>
       )}
+
+      <div style={{ marginBottom: '24px' }}>
+        <input
+          type="text"
+          placeholder="Search clients..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: '100%', padding: '12px 16px', fontSize: '14px', border: '1px solid var(--gray-300)', borderRadius: '6px', boxSizing: 'border-box' }}
+        />
+      </div>
 
       <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', overflow: 'hidden' }}>
         <table className="table">
           <thead>
             <tr>
-              <th>Brand</th>
-              <th>Platform</th>
-              <th>Status</th>
-              <th>Campaign Fee</th>
-              <th>Duration</th>
+              <th>Client</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Monthly Fee</th>
+              <th>Contract Dates</th>
+              <th>Auto-Renewal</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {campaigns && campaigns.length > 0 ? campaigns.map(campaign => (
-              <tr key={campaign.id}>
-                <td>{campaign.brandName}</td>
-                <td>{campaign.platform}</td>
-                <td>{campaign.status}</td>
-                <td>${formatCurrency(campaign.campaignFee || 0)}</td>
-                <td>{campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : 'N/A'} to {campaign.endDate ? new Date(campaign.endDate).toLocaleDateString() : 'N/A'}</td>
+            {filteredClients.length > 0 ? filteredClients.map(client => (
+              <tr key={client.id}>
+                <td>{client.clientName}</td>
+                <td>{client.clientContactName}</td>
+                <td>{client.clientContactEmail}</td>
+                <td>${formatCurrency(client.monthlyFee || 0)}</td>
                 <td>
-                  <button onClick={() => { setFormData(campaign); setEditingId(campaign.id); setShowForm(true) }} className="btn btn-primary btn-small">Edit</button>
-                  <button onClick={() => handleDelete(campaign.id)} className="btn btn-danger btn-small">Delete</button>
+                  {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString() : 'N/A'}
+                  {' to '}
+                  {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString() : 'N/A'}
+                </td>
+                <td>{client.autoRenewal ? '✓' : 'No'}</td>
+                <td>
+                  <button onClick={() => { setFormData(client); setEditingId(client.id); setShowForm(true) }} className="btn btn-primary btn-small">Edit</button>
+                  <button onClick={() => handleDeleteClient(client.id)} className="btn btn-danger btn-small">Delete</button>
                 </td>
               </tr>
             )) : (
-              <tr><td colSpan="6" style={{ textAlign: 'center' }}>No campaigns yet</td></tr>
+              <tr><td colSpan="7" style={{ textAlign: 'center' }}>No clients yet</td></tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>Revenue Dashboard</h3>
+          <div style={{ padding: '20px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+              ${formatCurrency(campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12)}
+            </p>
+            <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>Annual Revenue from Clients</p>
+          </div>
+        </div>
+
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>Contract Alerts</h3>
+          <div style={{ padding: '20px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+            {campaigns.filter(c => {
+              if (!c.contractEndDate) return false
+              const endDate = new Date(c.contractEndDate)
+              const today = new Date()
+              const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
+              return daysUntilEnd <= 90 && daysUntilEnd > 0
+            }).length > 0 ? (
+              <p style={{ margin: '0', fontSize: '12px', color: 'var(--danger)' }}>
+                {campaigns.filter(c => {
+                  if (!c.contractEndDate) return false
+                  const endDate = new Date(c.contractEndDate)
+                  const today = new Date()
+                  const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
+                  return daysUntilEnd <= 90 && daysUntilEnd > 0
+                }).length} contract(s) expiring within 90 days
+              </p>
+            ) : (
+              <p style={{ margin: '0', fontSize: '12px', color: 'var(--success)' }}>No contracts expiring soon</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
