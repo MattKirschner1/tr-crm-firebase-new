@@ -402,7 +402,19 @@ function App() {
                 className={`nav-item ${currentPage === 'socialmedia' ? 'active' : ''}`}
                 onClick={() => { setCurrentPage('socialmedia'); setMenuOpen(false) }}
               >
-                📊 <span>Campaigns</span>
+                🤝 <span>Current Clients</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'socialmedia-dashboard' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('socialmedia-dashboard'); setMenuOpen(false) }}
+              >
+                📈 <span>Revenue Dashboard</span>
+              </button>
+              <button
+                className={`nav-item ${currentPage === 'socialmedia-alerts' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('socialmedia-alerts'); setMenuOpen(false) }}
+              >
+                ⏰ <span>Contract Alerts</span>
               </button>
               <button
                 className={`nav-item ${currentPage === 'socialmedia-filesearch' ? 'active' : ''}`}
@@ -469,6 +481,8 @@ function App() {
         {currentPage === 'sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
         {currentPage === 'sponsorships-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} sponsorships={sponsorships} searchType="sponsorships" />}
         {currentPage === 'socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
+        {currentPage === 'socialmedia-dashboard' && <SocialMediaDashboardPage campaigns={socialMediaCampaigns} />}
+        {currentPage === 'socialmedia-alerts' && <SocialMediaContractAlertsPage campaigns={socialMediaCampaigns} />}
         {currentPage === 'socialmedia-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} campaigns={socialMediaCampaigns} searchType="socialmedia" />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
         {currentPage === 'usage' && <UsagePage isAdmin={isAdmin} />}
@@ -5731,6 +5745,175 @@ function AccountSettingsPage({ user, onUpdate }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function SocialMediaDashboardPage({ campaigns }) {
+  const totalMonthly = campaigns.reduce((sum, client) => sum + (client.monthlyFee || 0), 0)
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700' }}>Social Media Revenue Dashboard</h1>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Total Monthly Revenue</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+            ${totalMonthly.toFixed(2)}
+          </p>
+        </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Active Clients</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+            {campaigns.length}
+          </p>
+        </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Average Monthly Fee</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
+            ${campaigns.length > 0 ? (totalMonthly / campaigns.length).toFixed(2) : '0.00'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SocialMediaContractAlertsPage({ campaigns }) {
+  const getUpcomingExpirations = () => {
+    const today = new Date()
+
+    const alerts = []
+    campaigns.forEach(client => {
+      // Check contract term dates
+      if (client.contractEndDate) {
+        const endDate = new Date(client.contractEndDate)
+        const daysUntilExpiration = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
+
+        if (daysUntilExpiration <= 15 && daysUntilExpiration > 0) {
+          alerts.push({
+            clientName: client.clientName,
+            contractName: 'Contract Term',
+            startDate: client.contractStartDate,
+            endDate: client.contractEndDate,
+            daysUntilExpiration,
+            accountOwners: client.accountOwners || [],
+            monthlyFee: client.monthlyFee
+          })
+        } else if (daysUntilExpiration <= 0) {
+          alerts.push({
+            clientName: client.clientName,
+            contractName: 'Contract Term',
+            startDate: client.contractStartDate,
+            endDate: client.contractEndDate,
+            daysUntilExpiration,
+            accountOwners: client.accountOwners || [],
+            monthlyFee: client.monthlyFee,
+            isExpired: true
+          })
+        }
+      }
+
+      // Also check individual contract files
+      if (client.contracts && Array.isArray(client.contracts)) {
+        client.contracts.forEach(contract => {
+          if (contract.endDate) {
+            const endDate = new Date(contract.endDate)
+            const daysUntilExpiration = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
+
+            if (daysUntilExpiration <= 15 && daysUntilExpiration > 0) {
+              alerts.push({
+                clientName: client.clientName,
+                contractName: contract.fileName,
+                startDate: contract.startDate,
+                endDate: contract.endDate,
+                daysUntilExpiration,
+                accountOwners: client.accountOwners || [],
+                monthlyFee: client.monthlyFee
+              })
+            } else if (daysUntilExpiration <= 0) {
+              alerts.push({
+                clientName: client.clientName,
+                contractName: contract.fileName,
+                startDate: contract.startDate,
+                endDate: contract.endDate,
+                daysUntilExpiration,
+                accountOwners: client.accountOwners || [],
+                monthlyFee: client.monthlyFee,
+                isExpired: true
+              })
+            }
+          }
+        })
+      }
+    })
+
+    return alerts.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration)
+  }
+
+  const alerts = getUpcomingExpirations()
+
+  return (
+    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700' }}>⏰ Contract Alerts</h1>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Expiring Soon (15 days)</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: '#ff6b6b' }}>
+            {alerts.filter(a => !a.isExpired).length}
+          </p>
+        </div>
+        <div style={{ border: '1px solid var(--gray-300)', borderRadius: '6px', padding: '20px', backgroundColor: 'var(--gray-50)' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '600' }}>Already Expired</p>
+          <p style={{ margin: '0', fontSize: '28px', fontWeight: '700', color: '#dc2626' }}>
+            {alerts.filter(a => a.isExpired).length}
+          </p>
+        </div>
+      </div>
+
+      {alerts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px', backgroundColor: 'var(--gray-50)', borderRadius: '8px', border: '1px solid var(--gray-300)' }}>
+          <p style={{ margin: '0', fontSize: '16px', color: 'var(--gray-600)', fontWeight: '500' }}>✓ No upcoming contract expirations</p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--gray-600)' }}>All contracts are current</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+          {alerts.map((alert, idx) => (
+            <div
+              key={idx}
+              style={{
+                border: `2px solid ${alert.isExpired ? '#dc2626' : alert.daysUntilExpiration <= 7 ? '#ff6b6b' : '#fbbf24'}`,
+                borderRadius: '6px',
+                padding: '16px',
+                backgroundColor: alert.isExpired ? '#fee2e2' : alert.daysUntilExpiration <= 7 ? '#fef2f2' : '#fffbeb'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                <div>
+                  <p style={{ margin: '0 0 4px 0', fontWeight: '600', fontSize: '14px' }}>
+                    {alert.clientName}
+                  </p>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '12px', color: 'var(--gray-600)' }}>
+                    📄 {alert.contractName}
+                  </p>
+                  {(alert.startDate || alert.endDate) && (
+                    <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: 'var(--gray-500)' }}>
+                      {alert.startDate ? new Date(alert.startDate).toLocaleDateString() : 'N/A'} to {alert.endDate ? new Date(alert.endDate).toLocaleDateString() : 'N/A'}
+                    </p>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ margin: '0', fontWeight: '700', fontSize: '16px', color: alert.isExpired ? '#dc2626' : alert.daysUntilExpiration <= 7 ? '#ff6b6b' : '#d97706' }}>
+                    {alert.isExpired ? 'EXPIRED' : `${alert.daysUntilExpiration}d`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
