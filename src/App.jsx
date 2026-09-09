@@ -38,6 +38,10 @@ const formatCurrency = (amount) => {
   return amount.toFixed(0)
 }
 
+const formatCurrencyFull = (amount) => {
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 const getQuarterYear = (date) => {
   const d = new Date(date)
   const quarter = Math.ceil((d.getMonth() + 1) / 3)
@@ -1480,7 +1484,11 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     servicesCompletedDate: '',
     paymentDate: '',
     agency: '',
-    fileAttachments: []
+    fileAttachments: [],
+    seasonalReminder: false,
+    seasonalReminderDate: '',
+    campaignAssets: [],
+    campaignLinks: []
   })
   const fileInputRef = React.useRef(null)
 
@@ -4075,7 +4083,8 @@ function PRClientsPage({ prClients, setPrClients, user }) {
     contractStartDate: '',
     contractEndDate: '',
     autoRenewal: false,
-    contracts: []
+    contracts: [],
+    upcharges: []
   })
   const contractFileInputRef = React.useRef(null)
 
@@ -4676,13 +4685,13 @@ function PRClientsPage({ prClients, setPrClients, user }) {
               <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Annual Revenue</p>
                 <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
-                  ${(prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12).toFixed(2)}
+                  ${formatCurrencyFull(prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12)}
                 </p>
               </div>
               <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client</p>
                 <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
-                  ${prClients.length > 0 ? ((prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / prClients.length).toFixed(2) : '0.00'}
+                  ${prClients.length > 0 ? formatCurrencyFull((prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / prClients.length) : '0.00'}
                 </p>
               </div>
             </div>
@@ -5412,13 +5421,13 @@ function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, do
             <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Annual Revenue</p>
               <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
-                ${formatCurrency(campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12)}
+                ${formatCurrencyFull(campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12)}
               </p>
             </div>
             <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client</p>
               <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
-                ${campaigns.length > 0 ? formatCurrency((campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / campaigns.length) : '0.00'}
+                ${campaigns.length > 0 ? formatCurrencyFull((campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / campaigns.length) : '0.00'}
               </p>
             </div>
           </div>
