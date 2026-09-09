@@ -4672,35 +4672,54 @@ function PRClientsPage({ prClients, setPrClients, user }) {
         <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>Revenue Dashboard</h3>
-            <div style={{ padding: '20px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
-                ${(prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12).toFixed(2)}
-              </p>
-              <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>Annual Revenue from Clients</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+              <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Annual Revenue</p>
+                <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
+                  ${(prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12).toFixed(2)}
+                </p>
+              </div>
+              <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client</p>
+                <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
+                  ${prClients.length > 0 ? ((prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / prClients.length).toFixed(2) : '0.00'}
+                </p>
+              </div>
             </div>
           </div>
 
           <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>Contract Alerts</h3>
-            <div style={{ padding: '20px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+            <div style={{ padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', maxHeight: '200px', overflowY: 'auto' }}>
               {prClients.filter(c => {
                 if (!c.contractEndDate) return false
                 const endDate = new Date(c.contractEndDate)
                 const today = new Date()
                 const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
-                return daysUntilEnd <= 90 && daysUntilEnd > 0
+                return daysUntilEnd <= 30 && daysUntilEnd > 0
               }).length > 0 ? (
-                <p style={{ margin: '0', fontSize: '12px', color: 'var(--danger)' }}>
+                <div>
                   {prClients.filter(c => {
                     if (!c.contractEndDate) return false
                     const endDate = new Date(c.contractEndDate)
                     const today = new Date()
                     const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
-                    return daysUntilEnd <= 90 && daysUntilEnd > 0
-                  }).length} contract(s) expiring within 90 days
-                </p>
+                    return daysUntilEnd <= 30 && daysUntilEnd > 0
+                  }).sort((a, b) => {
+                    const daysA = Math.ceil((new Date(a.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24))
+                    const daysB = Math.ceil((new Date(b.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24))
+                    return daysA - daysB
+                  }).map((client, idx) => (
+                    <div key={idx} style={{ padding: '8px', marginBottom: '6px', backgroundColor: 'white', borderRadius: '4px', borderLeft: '3px solid #ff6b6b' }}>
+                      <p style={{ margin: '0 0 2px 0', fontSize: '12px', fontWeight: '600' }}>{client.clientName}</p>
+                      <p style={{ margin: '0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                        Expires: {new Date(client.contractEndDate).toLocaleDateString()} ({Math.ceil((new Date(client.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24))} days)
+                      </p>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <p style={{ margin: '0', fontSize: '12px', color: 'var(--success)' }}>No contracts expiring soon</p>
+                <p style={{ margin: '0', fontSize: '12px', color: 'var(--success)' }}>✓ No contracts expiring within 30 days</p>
               )}
             </div>
           </div>
@@ -5389,35 +5408,54 @@ function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, do
       <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>Revenue Dashboard</h3>
-          <div style={{ padding: '20px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '700', color: 'var(--primary)' }}>
-              ${formatCurrency(campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12)}
-            </p>
-            <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>Annual Revenue from Clients</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+            <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Annual Revenue</p>
+              <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
+                ${formatCurrency(campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12)}
+              </p>
+            </div>
+            <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client</p>
+              <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
+                ${campaigns.length > 0 ? formatCurrency((campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / campaigns.length) : '0.00'}
+              </p>
+            </div>
           </div>
         </div>
 
         <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600' }}>Contract Alerts</h3>
-          <div style={{ padding: '20px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+          <div style={{ padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', maxHeight: '200px', overflowY: 'auto' }}>
             {campaigns.filter(c => {
               if (!c.contractEndDate) return false
               const endDate = new Date(c.contractEndDate)
               const today = new Date()
               const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
-              return daysUntilEnd <= 90 && daysUntilEnd > 0
+              return daysUntilEnd <= 30 && daysUntilEnd > 0
             }).length > 0 ? (
-              <p style={{ margin: '0', fontSize: '12px', color: 'var(--danger)' }}>
+              <div>
                 {campaigns.filter(c => {
                   if (!c.contractEndDate) return false
                   const endDate = new Date(c.contractEndDate)
                   const today = new Date()
                   const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24))
-                  return daysUntilEnd <= 90 && daysUntilEnd > 0
-                }).length} contract(s) expiring within 90 days
-              </p>
+                  return daysUntilEnd <= 30 && daysUntilEnd > 0
+                }).sort((a, b) => {
+                  const daysA = Math.ceil((new Date(a.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24))
+                  const daysB = Math.ceil((new Date(b.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24))
+                  return daysA - daysB
+                }).map((client, idx) => (
+                  <div key={idx} style={{ padding: '8px', marginBottom: '6px', backgroundColor: 'white', borderRadius: '4px', borderLeft: '3px solid #ff6b6b' }}>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '12px', fontWeight: '600' }}>{client.clientName}</p>
+                    <p style={{ margin: '0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                      Expires: {new Date(client.contractEndDate).toLocaleDateString()} ({Math.ceil((new Date(client.contractEndDate) - new Date()) / (1000 * 60 * 60 * 24))} days)
+                    </p>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <p style={{ margin: '0', fontSize: '12px', color: 'var(--success)' }}>No contracts expiring soon</p>
+              <p style={{ margin: '0', fontSize: '12px', color: 'var(--success)' }}>✓ No contracts expiring within 30 days</p>
             )}
           </div>
         </div>
