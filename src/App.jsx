@@ -56,10 +56,11 @@ function App() {
   const [prClients, setPrClients] = useState([])
   const [sponsorships, setSponsorships] = useState([])
   const [socialMediaCampaigns, setSocialMediaCampaigns] = useState([])
+  const [marketingServices, setMarketingServices] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false, sponsorships: false, socialmedia: false })
+  const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false, sponsorships: false, socialmedia: false, marketing: false })
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
 
@@ -83,6 +84,7 @@ function App() {
         loadPRClients()
         loadSponsorships()
         loadSocialMediaCampaigns()
+        loadMarketingServices()
 
         // Track last login and check profile completion
         try {
@@ -185,6 +187,17 @@ function App() {
       setSocialMediaCampaigns(campaigns)
     } catch (error) {
       console.error('Error loading social media campaigns:', error)
+    }
+  }
+
+  const loadMarketingServices = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'marketingServices'))
+      const services = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      services.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      setMarketingServices(services)
+    } catch (error) {
+      console.error('Error loading marketing services:', error)
     }
   }
 
@@ -379,6 +392,26 @@ function App() {
             </>
           )}
 
+          {/* MARKETING SERVICES SECTION */}
+          <button
+            className="nav-section-header"
+            onClick={() => setExpandedSections({ ...expandedSections, marketing: !expandedSections.marketing })}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: '600', width: '100%', marginTop: '8px' }}
+          >
+            <span>{expandedSections.marketing ? '▼' : '▶'}</span>
+            <span>🎯 Marketing Services</span>
+          </button>
+          {expandedSections.marketing && (
+            <>
+              <button
+                className={`nav-item ${currentPage === 'marketing' ? 'active' : ''}`}
+                onClick={() => { setCurrentPage('marketing'); setMenuOpen(false) }}
+              >
+                📋 <span>Opportunities</span>
+              </button>
+            </>
+          )}
+
           {/* SOCIAL MEDIA MANAGEMENT SECTION */}
           <button
             className="nav-section-header"
@@ -458,6 +491,7 @@ function App() {
         {currentPage === 'pr-clients' && <PRClientsPage prClients={prClients} setPrClients={setPrClients} user={user} />}
         {currentPage === 'sponsorships' && <SponsorshipsPage sponsorships={sponsorships} setSponsorships={setSponsorships} user={user} contacts={contacts} onReload={loadSponsorships} downloadFile={downloadFile} />}
         {currentPage === 'sponsorships-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} sponsorships={sponsorships} searchType="sponsorships" />}
+        {currentPage === 'marketing' && <MarketingServicesPage marketingServices={marketingServices} setMarketingServices={setMarketingServices} user={user} contacts={contacts} onReload={loadMarketingServices} downloadFile={downloadFile} />}
         {currentPage === 'socialmedia' && <SocialMediaPage campaigns={socialMediaCampaigns} setCampaigns={setSocialMediaCampaigns} user={user} contacts={contacts} onReload={loadSocialMediaCampaigns} downloadFile={downloadFile} />}
         {currentPage === 'socialmedia-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} campaigns={socialMediaCampaigns} searchType="socialmedia" />}
         {currentPage === 'users' && <UsersPage isAdmin={isAdmin} onUserRemoved={() => {}} />}
@@ -1404,8 +1438,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const [showRepTalentSuggestions, setShowRepTalentSuggestions] = useState(false)
   const [brandSearch, setBrandSearch] = useState('')
   const [showBrandSuggestions, setShowBrandSuggestions] = useState(false)
-  const [brandRepSearch, setBrandRepSearch] = useState('')
-  const [showBrandRepSuggestions, setShowBrandRepSuggestions] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
   const [contactModalContext, setContactModalContext] = useState('brand') // 'brand', 'talent', 'brandRep'
   const [newContactData, setNewContactData] = useState({ name: '', email: '', phone: '', company: '', title: '', type: '', notes: '' })
@@ -1442,8 +1474,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const currentUserName = currentUser?.name || user.email
 
   const [formData, setFormData] = useState({
+    dealTitle: '',
     brand: '',
     brandId: '',
+    clientType: '',
     talent: '',
     dealDate: new Date().toISOString().split('T')[0],
     dealOwnerEmail: user.email,
@@ -1464,8 +1498,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     sagFeeCost: 0,
     otherCosts: 0,
     contactId: '',
-    brandReps: [],
-    brandRepIds: [],
     repForTalent: [],
     repForTalentIds: [],
     services: [],
@@ -1483,7 +1515,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     contractSignedDate: '',
     servicesCompletedDate: '',
     paymentDate: '',
-    agency: '',
     fileAttachments: [],
     seasonalReminder: false,
     seasonalReminderDate: '',
@@ -1495,10 +1526,13 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const filesWithUploadedBy = (formData.fileAttachments || []).map(file => ({
-        ...file,
-        uploadedBy: user.email
-      }))
+      const filesWithUploadedBy = (formData.fileAttachments || []).map(file => {
+        const { dataUrl, ...fileWithoutDataUrl } = file
+        return {
+          ...fileWithoutDataUrl,
+          uploadedBy: user.email
+        }
+      })
 
       const dataToSave = {
         ...formData,
@@ -1593,8 +1627,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
 
   const resetForm = () => {
     setFormData({
+      dealTitle: '',
       brand: '',
       brandId: '',
+      clientType: '',
       talent: '',
       dealDate: new Date().toISOString().split('T')[0],
       dealOwnerEmail: user.email,
@@ -1615,8 +1651,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       sagFeeCost: 0,
       otherCosts: 0,
       contactId: '',
-      brandReps: [],
-      brandRepIds: [],
       repForTalent: [],
       repForTalentIds: [],
       services: [],
@@ -1634,13 +1668,11 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       contractSignedDate: '',
       servicesCompletedDate: '',
       paymentDate: '',
-      agency: '',
       fileAttachments: []
     })
     setExpandedServices({})
     setContactSearch('')
     setRepTalentSearch('')
-    setBrandRepSearch('')
     setDealOwnerSearch('')
     setEditingId(null)
     setShowForm(false)
@@ -1711,9 +1743,9 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       if (contactModalContext === 'brand') {
         setFormData({...formData, contactId: newContact.id})
         setContactSearch(newContactData.name)
-      } else {
-        setFormData({...formData, repForTalentId: newContact.id, repForTalent: newContactData.name})
-        setRepTalentSearch(newContactData.name)
+      } else if (contactModalContext === 'talent') {
+        setFormData({...formData, repForTalent: [...formData.repForTalent, newContactData.name], repForTalentIds: [...formData.repForTalentIds, newContact.id]})
+        setRepTalentSearch('')
       }
       setNewContactData({ name: '', email: '', phone: '', company: '', title: '', type: '', notes: '' })
       setShowContactModal(false)
@@ -1726,7 +1758,9 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const openEdit = (deal) => {
     setFormData({
       ...deal,
+      dealTitle: deal.dealTitle || '',
       dealDate: deal.dealDate || new Date().toISOString().split('T')[0],
+      clientType: deal.clientType || '',
       talentFee: deal.talentFee || 0,
       brokerFee: deal.brokerFee || 0,
       sagFeeCost: deal.sagFeeCost || 0,
@@ -1735,8 +1769,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       stylingBuyout: deal.stylingBuyout || false,
       travelBuyout: deal.travelBuyout || false,
       sagFee: deal.sagFee || false,
-      brandReps: deal.brandReps || [],
-      brandRepIds: deal.brandRepIds || [],
       repForTalent: Array.isArray(deal.repForTalent) ? deal.repForTalent : (deal.repForTalent ? [deal.repForTalent] : []),
       repForTalentIds: deal.repForTalentIds || [],
       services: Array.isArray(deal.services) ? deal.services : [],
@@ -1777,6 +1809,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const filteredDeals = deals.filter(d => {
     const ownerMatch = filterOwner === 'all' || (d.dealOwnerEmail || 'unassigned') === filterOwner
     const searchMatch = !search ||
+      (d.dealTitle && d.dealTitle.toLowerCase().includes(search.toLowerCase())) ||
       d.brand.toLowerCase().includes(search.toLowerCase()) ||
       d.talent.toLowerCase().includes(search.toLowerCase())
     return ownerMatch && searchMatch
@@ -1884,7 +1917,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       <div className="search-bar" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <input
           type="text"
-          placeholder="Search by brand, talent..."
+          placeholder="Search by deal title, client, talent..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: '200px', padding: '10px 12px', border: '1px solid var(--gray-300)', borderRadius: '6px', fontSize: '14px' }}
@@ -1907,6 +1940,19 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: '90vw', width: '100%' }}>
             <h2>{editingId ? 'Edit Deal' : 'New Deal'}</h2>
             <form onSubmit={handleSubmit}>
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label>Deal Title <span style={{ color: 'red' }}>*</span></label>
+                <input
+                  type="text"
+                  placeholder="e.g., Movado Multi-Talent Ambassador Program, Q1"
+                  value={formData.dealTitle}
+                  onChange={(e) => setFormData({...formData, dealTitle: e.target.value.slice(0, 80)})}
+                  maxLength="80"
+                  required
+                  style={{ width: '100%' }}
+                />
+                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--gray-500)' }}>{formData.dealTitle.length}/80 characters</p>
+              </div>
               <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', '@media (max-width: 768px)': { gridTemplateColumns: '1fr' } }}>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label>Deal Owner</label>
@@ -1951,10 +1997,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                   </select>
                 </div>
                 <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Brand <span style={{ fontSize: '12px', color: 'var(--gray-500)', fontWeight: 'normal' }}>(type to search or add new)</span></label>
+                  <label>Client <span style={{ fontSize: '12px', color: 'var(--gray-500)', fontWeight: 'normal' }}>(type to search or add new)</span></label>
                   <input
                     type="text"
-                    placeholder="Search or type brand name..."
+                    placeholder="Search or type client name..."
                     value={formData.brand}
                     onChange={(e) => {
                       setFormData({...formData, brand: e.target.value})
@@ -1984,224 +2030,137 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                       ))}
                       {brandSearch && !Array.from(new Set(deals.map(d => d.brand).filter(b => b && b.toLowerCase().includes(brandSearch.toLowerCase())))).length && (
                         <div style={{ padding: '12px', color: 'var(--primary)', fontSize: '14px', textAlign: 'center', fontWeight: '500', backgroundColor: 'var(--gray-50)', borderTop: '1px solid var(--gray-200)' }}>
-                          + Create new brand: "{brandSearch}"
+                          + Create new client: "{brandSearch}"
                         </div>
                       )}
                     </div>
                   )}
                 </div>
                 <div className="form-group">
+                  <label>Client Type</label>
+                  <select value={formData.clientType} onChange={(e) => setFormData({...formData, clientType: e.target.value})}>
+                    <option value="">-- Select Type --</option>
+                    <option value="Brand">Brand</option>
+                    <option value="Agency">Agency</option>
+                    <option value="Event Producer">Event Producer</option>
+                    <option value="Private Individual">Private Individual</option>
+                    <option value="Media or Production Company">Media or Production Company</option>
+                    <option value="Nonprofit">Nonprofit</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label>Deal Date</label>
                   <input type="date" value={formData.dealDate} onChange={(e) => setFormData({...formData, dealDate: e.target.value})} required />
                 </div>
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div className="form-group">
                   <label>Talent</label>
-                  <input type="text" value={formData.talent} onChange={(e) => setFormData({...formData, talent: e.target.value})} required />
+                  <input type="text" value={formData.talent} onChange={(e) => setFormData({...formData, talent: e.target.value})} style={{ padding: '8px 12px', height: 'auto' }} required />
                 </div>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Brand Rep(s)</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                    {formData.brandReps && formData.brandReps.map((rep, idx) => (
-                      <span key={idx} style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {rep}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newReps = formData.brandReps.filter((_, i) => i !== idx)
-                            const newIds = formData.brandRepIds.filter((_, i) => i !== idx)
-                            setFormData({...formData, brandReps: newReps, brandRepIds: newIds})
-                          }}
-                          style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '0', fontSize: '14px' }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Search or add brand rep..."
-                      value={brandRepSearch}
-                      onChange={(e) => {
-                        setBrandRepSearch(e.target.value)
-                        setShowBrandRepSuggestions(true)
-                      }}
-                      onFocus={() => setShowBrandRepSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowBrandRepSuggestions(false), 200)}
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setContactModalContext('brandRep')
-                        setShowContactModal(true)
-                      }}
-                      style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}
-                    >
-                      New Contact
-                    </button>
-                  </div>
-                  {showBrandRepSuggestions && brandRepSearch && (
-                    <div style={{ position: 'absolute', top: '100%', left: '0', right: '0', backgroundColor: 'white', border: '1px solid var(--gray-300)', borderTop: 'none', borderRadius: '0 0 6px 6px', maxHeight: '200px', overflowY: 'auto', zIndex: '10', marginTop: '2px' }}>
-                      {contacts.filter(c => c.name.toLowerCase().includes(brandRepSearch.toLowerCase()) && !formData.brandReps.includes(c.name)).map(c => (
-                        <div
-                          key={c.id}
-                          onClick={() => {
-                            setFormData({...formData, brandReps: [...formData.brandReps, c.name], brandRepIds: [...formData.brandRepIds, c.id]})
-                            setBrandRepSearch('')
-                            setShowBrandRepSuggestions(false)
-                          }}
-                          style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-200)' }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--gray-100)'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                        >
-                          {c.name}
-                        </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start', gridColumn: '1 / -1' }}>
+                  <div className="form-group" style={{ position: 'relative', alignSelf: 'start', marginTop: 0, top: 0 }}>
+                    <label>Rep for Talent</label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      {formData.repForTalent && formData.repForTalent.map((rep, idx) => (
+                        <span key={idx} style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {rep}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newReps = formData.repForTalent.filter((_, i) => i !== idx)
+                              const newIds = formData.repForTalentIds.filter((_, i) => i !== idx)
+                              setFormData({...formData, repForTalent: newReps, repForTalentIds: newIds})
+                            }}
+                            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '0', fontSize: '14px' }}
+                          >
+                            ×
+                          </button>
+                        </span>
                       ))}
-                      {contacts.filter(c => c.name.toLowerCase().includes(brandRepSearch.toLowerCase())).length === 0 && (
-                        <div
-                          onClick={async () => {
-                            try {
-                              const newContact = await addDoc(collection(db, 'contacts'), {
-                                name: brandRepSearch,
-                                email: '',
-                                type: '',
-                                title: '',
-                                company: '',
-                                phone: '',
-                                notes: '',
-                                userId: user.uid,
-                                createdAt: new Date()
-                              })
-                              setFormData({...formData, brandReps: [...formData.brandReps, brandRepSearch], brandRepIds: [...formData.brandRepIds, newContact.id]})
-                              setBrandRepSearch('')
-                              setShowBrandRepSuggestions(false)
-                              onContactAdded()
-                            } catch (err) {
-                              alert('Error adding contact: ' + err.message)
-                            }
-                          }}
-                          style={{ padding: '8px 12px', color: 'var(--primary)', fontSize: '14px', cursor: 'pointer', textAlign: 'center', fontWeight: '500', borderTop: '1px solid var(--gray-200)', backgroundColor: 'var(--gray-50)' }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = 'var(--primary)'
-                            e.target.style.color = 'white'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = 'var(--gray-50)'
-                            e.target.style.color = 'var(--primary)'
-                          }}
-                        >
-                          + Add "{brandRepSearch}" as new contact
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Rep for Talent</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                    {formData.repForTalent && formData.repForTalent.map((rep, idx) => (
-                      <span key={idx} style={{ backgroundColor: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {rep}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newReps = formData.repForTalent.filter((_, i) => i !== idx)
-                            const newIds = formData.repForTalentIds.filter((_, i) => i !== idx)
-                            setFormData({...formData, repForTalent: newReps, repForTalentIds: newIds})
-                          }}
-                          style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '0', fontSize: '14px' }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="Search or add talent rep..."
-                      value={repTalentSearch}
-                      onChange={(e) => {
-                        setRepTalentSearch(e.target.value)
-                        setShowRepTalentSuggestions(true)
-                      }}
-                      onFocus={() => setShowRepTalentSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowRepTalentSuggestions(false), 200)}
-                      style={{ flex: 1 }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setContactModalContext('talent')
-                        setShowContactModal(true)
-                      }}
-                      style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}
-                    >
-                      New Contact
-                    </button>
-                  </div>
-                  {showRepTalentSuggestions && repTalentSearch && (
-                    <div style={{ position: 'absolute', top: '100%', left: '0', right: '0', backgroundColor: 'white', border: '1px solid var(--gray-300)', borderTop: 'none', borderRadius: '0 0 6px 6px', maxHeight: '200px', overflowY: 'auto', zIndex: '10', marginTop: '2px' }}>
-                      {contacts.filter(c => c.name.toLowerCase().includes(repTalentSearch.toLowerCase()) && !formData.repForTalent.includes(c.name)).map(c => (
-                        <div
-                          key={c.id}
-                          onClick={() => {
-                            setFormData({...formData, repForTalent: [...formData.repForTalent, c.name], repForTalentIds: [...formData.repForTalentIds, c.id]})
-                            setRepTalentSearch('')
-                            setShowRepTalentSuggestions(false)
-                          }}
-                          style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-200)' }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--gray-100)'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                        >
-                          {c.name}
-                        </div>
-                      ))}
-                      {contacts.filter(c => c.name.toLowerCase().includes(repTalentSearch.toLowerCase())).length === 0 && (
-                        <div
-                          onClick={async () => {
-                            try {
-                              const newContact = await addDoc(collection(db, 'contacts'), {
-                                name: repTalentSearch,
-                                email: '',
-                                type: '',
-                                title: '',
-                                company: '',
-                                phone: '',
-                                notes: '',
-                                userId: user.uid,
-                                createdAt: new Date()
-                              })
-                              setFormData({...formData, repForTalent: [...formData.repForTalent, repTalentSearch], repForTalentIds: [...formData.repForTalentIds, newContact.id]})
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search or add talent rep..."
+                        value={repTalentSearch}
+                        onChange={(e) => {
+                          setRepTalentSearch(e.target.value)
+                          setShowRepTalentSuggestions(true)
+                        }}
+                        onFocus={() => setShowRepTalentSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowRepTalentSuggestions(false), 200)}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setContactModalContext('talent')
+                          setShowContactModal(true)
+                        }}
+                        style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}
+                      >
+                        New Contact
+                      </button>
+                    </div>
+                    {showRepTalentSuggestions && repTalentSearch && (
+                      <div style={{ position: 'absolute', top: '100%', left: '0', right: '0', backgroundColor: 'white', border: '1px solid var(--gray-300)', borderTop: 'none', borderRadius: '0 0 6px 6px', maxHeight: '200px', overflowY: 'auto', zIndex: '10', marginTop: '2px' }}>
+                        {contacts.filter(c => c.name.toLowerCase().includes(repTalentSearch.toLowerCase()) && !formData.repForTalent.includes(c.name)).map(c => (
+                          <div
+                            key={c.id}
+                            onClick={() => {
+                              setFormData({...formData, repForTalent: [...formData.repForTalent, c.name], repForTalentIds: [...formData.repForTalentIds, c.id]})
                               setRepTalentSearch('')
                               setShowRepTalentSuggestions(false)
-                              onContactAdded()
-                            } catch (err) {
-                              alert('Error adding contact: ' + err.message)
-                            }
-                          }}
-                          style={{ padding: '8px 12px', color: 'var(--primary)', fontSize: '14px', cursor: 'pointer', textAlign: 'center', fontWeight: '500', borderTop: '1px solid var(--gray-200)', backgroundColor: 'var(--gray-50)' }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = 'var(--primary)'
-                            e.target.style.color = 'white'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = 'var(--gray-50)'
-                            e.target.style.color = 'var(--primary)'
-                          }}
-                        >
-                          + Add "{repTalentSearch}" as new contact
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Brand Contact</label>
+                            }}
+                            style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--gray-200)' }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--gray-100)'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                          >
+                            {c.name}
+                          </div>
+                        ))}
+                        {contacts.filter(c => c.name.toLowerCase().includes(repTalentSearch.toLowerCase())).length === 0 && (
+                          <div
+                            onClick={async () => {
+                              try {
+                                const newContact = await addDoc(collection(db, 'contacts'), {
+                                  name: repTalentSearch,
+                                  email: '',
+                                  type: '',
+                                  title: '',
+                                  company: '',
+                                  phone: '',
+                                  notes: '',
+                                  userId: user.uid,
+                                  createdAt: new Date()
+                                })
+                                setFormData({...formData, repForTalent: [...formData.repForTalent, repTalentSearch], repForTalentIds: [...formData.repForTalentIds, newContact.id]})
+                                setRepTalentSearch('')
+                                setShowRepTalentSuggestions(false)
+                                onContactAdded()
+                              } catch (err) {
+                                alert('Error adding contact: ' + err.message)
+                              }
+                            }}
+                            style={{ padding: '8px 12px', color: 'var(--primary)', fontSize: '14px', cursor: 'pointer', textAlign: 'center', fontWeight: '500', borderTop: '1px solid var(--gray-200)', backgroundColor: 'var(--gray-50)' }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = 'var(--primary)'
+                              e.target.style.color = 'white'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'var(--gray-50)'
+                              e.target.style.color = 'var(--primary)'
+                            }}
+                          >
+                            + Add "{repTalentSearch}" as new contact
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="form-group" style={{ position: 'relative', alignSelf: 'start', marginTop: 0, top: 0 }}>
+                    <label>Brand Contact</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input
                       type="text"
@@ -2306,30 +2265,24 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                     </div>
                     <div className="form-group">
                       <label>Glam Cost ($)</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="number" value={formData.glamCost} onChange={(e) => setFormData({...formData, glamCost: e.target.value})} style={{ flex: 1 }} />
-                        <label style={{ whiteSpace: 'nowrap', marginBottom: 0 }}>
-                          <input type="checkbox" checked={formData.glamBuyout} onChange={(e) => setFormData({...formData, glamBuyout: e.target.checked})} /> Buyout
-                        </label>
-                      </div>
+                      <input type="number" value={formData.glamCost} onChange={(e) => setFormData({...formData, glamCost: e.target.value})} style={{ marginBottom: '6px' }} />
+                      <label style={{ whiteSpace: 'nowrap', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={formData.glamBuyout} onChange={(e) => setFormData({...formData, glamBuyout: e.target.checked})} /> Buyout
+                      </label>
                     </div>
                     <div className="form-group">
                       <label>Styling Cost ($)</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="number" value={formData.stylingCost} onChange={(e) => setFormData({...formData, stylingCost: e.target.value})} style={{ flex: 1 }} />
-                        <label style={{ whiteSpace: 'nowrap', marginBottom: 0 }}>
-                          <input type="checkbox" checked={formData.stylingBuyout} onChange={(e) => setFormData({...formData, stylingBuyout: e.target.checked})} /> Buyout
-                        </label>
-                      </div>
+                      <input type="number" value={formData.stylingCost} onChange={(e) => setFormData({...formData, stylingCost: e.target.value})} style={{ marginBottom: '6px' }} />
+                      <label style={{ whiteSpace: 'nowrap', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={formData.stylingBuyout} onChange={(e) => setFormData({...formData, stylingBuyout: e.target.checked})} /> Buyout
+                      </label>
                     </div>
                     <div className="form-group">
                       <label>Travel Cost ($)</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="number" value={formData.travelCost} onChange={(e) => setFormData({...formData, travelCost: e.target.value})} style={{ flex: 1 }} />
-                        <label style={{ whiteSpace: 'nowrap', marginBottom: 0 }}>
-                          <input type="checkbox" checked={formData.travelBuyout} onChange={(e) => setFormData({...formData, travelBuyout: e.target.checked})} /> Buyout
-                        </label>
-                      </div>
+                      <input type="number" value={formData.travelCost} onChange={(e) => setFormData({...formData, travelCost: e.target.value})} style={{ marginBottom: '6px' }} />
+                      <label style={{ whiteSpace: 'nowrap', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={formData.travelBuyout} onChange={(e) => setFormData({...formData, travelBuyout: e.target.checked})} /> Buyout
+                      </label>
                     </div>
                     <div className="form-group">
                       <label>Talent Fee ($)</label>
@@ -2341,12 +2294,10 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                     </div>
                     <div className="form-group">
                       <label>SAG Fee ($)</label>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input type="number" value={formData.sagFeeCost} onChange={(e) => setFormData({...formData, sagFeeCost: e.target.value})} placeholder="0" style={{ flex: 1 }} />
-                        <label style={{ whiteSpace: 'nowrap', marginBottom: 0 }}>
-                          <input type="checkbox" checked={formData.sagFee} onChange={(e) => setFormData({...formData, sagFee: e.target.checked})} /> Applies
-                        </label>
-                      </div>
+                      <input type="number" value={formData.sagFeeCost} onChange={(e) => setFormData({...formData, sagFeeCost: e.target.value})} placeholder="0" style={{ marginBottom: '6px' }} />
+                      <label style={{ whiteSpace: 'nowrap', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input type="checkbox" checked={formData.sagFee} onChange={(e) => setFormData({...formData, sagFee: e.target.checked})} /> Applies
+                      </label>
                     </div>
                     <div className="form-group">
                       <label>Other Costs ($)</label>
@@ -2504,11 +2455,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                   )}
                 </div>
 
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Agency</label>
-                  <input type="text" placeholder="e.g., CAA, WME, Gersh" value={formData.agency} onChange={(e) => setFormData({...formData, agency: e.target.value})} />
-                </div>
-
                 <div style={{ gridColumn: '1 / -1', borderTop: '2px solid var(--gray-300)', paddingTop: '20px', marginTop: '24px' }}>
                   <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Deal Timeline</h3>
                   <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
@@ -2538,6 +2484,110 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                     </div>
                   </div>
                 </div>
+                </div>
+
+                <div style={{ gridColumn: '1 / -1', borderTop: '2px solid var(--gray-300)', paddingTop: '20px', marginTop: '24px' }}>
+                  <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Seasonal Reminders</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: '0' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.seasonalReminder}
+                        onChange={(e) => setFormData({...formData, seasonalReminder: e.target.checked})}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '14px', fontWeight: '500' }}>Set reminder to reach out (seasonal)</span>
+                    </label>
+                    {formData.seasonalReminder && (
+                      <input
+                        type="date"
+                        value={formData.seasonalReminderDate}
+                        onChange={(e) => setFormData({...formData, seasonalReminderDate: e.target.value})}
+                        style={{ flex: 1, padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {formData.status === 'Closed Won' && (
+                  <div style={{ gridColumn: '1 / -1', borderTop: '2px solid var(--gray-300)', paddingTop: '20px', marginTop: '24px' }}>
+                    <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Campaign Assets</h3>
+
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ fontSize: '14px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>Upload Asset Files</label>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          const newAssets = Array.from(e.target.files || []).map(file => ({
+                            name: file.name,
+                            size: file.size,
+                            type: file.type,
+                            uploadedAt: new Date().toISOString()
+                          }))
+                          setFormData({...formData, campaignAssets: [...(formData.campaignAssets || []), ...newAssets]})
+                          e.target.value = ''
+                        }}
+                        style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', width: '100%' }}
+                      />
+                    </div>
+
+                    {formData.campaignAssets && formData.campaignAssets.length > 0 && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <p style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Uploaded Files:</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {formData.campaignAssets.map((asset, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', backgroundColor: 'var(--gray-50)', borderRadius: '4px' }}>
+                              <span style={{ fontSize: '12px' }}>📎 {asset.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({...formData, campaignAssets: formData.campaignAssets.filter((_, i) => i !== idx)})}
+                                style={{ background: '#ff6b6b', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label style={{ fontSize: '14px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>Campaign Links / Content URLs</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {formData.campaignLinks && formData.campaignLinks.map((link, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="url"
+                              value={link}
+                              onChange={(e) => {
+                                const newLinks = [...formData.campaignLinks]
+                                newLinks[idx] = e.target.value
+                                setFormData({...formData, campaignLinks: newLinks})
+                              }}
+                              placeholder="https://..."
+                              style={{ flex: 1, padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setFormData({...formData, campaignLinks: formData.campaignLinks.filter((_, i) => i !== idx)})}
+                              style={{ background: '#ff6b6b', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, campaignLinks: [...(formData.campaignLinks || []), '']})}
+                          style={{ padding: '8px 12px', border: '1px solid var(--primary)', color: 'var(--primary)', background: 'white', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '500', marginTop: '8px' }}
+                        >
+                          + Add Link
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
@@ -2614,17 +2664,25 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                   <div key={deal.id} style={{ backgroundColor: 'white', borderRadius: '6px', padding: '12px', border: '1px solid var(--gray-300)', cursor: 'pointer' }} onClick={() => toggleDealExpand(deal.id)}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                       <div style={{ flex: 1 }}>
-                        <p
-                          style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontSize: '14px', color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
-                          onClick={(e) => { e.stopPropagation(); setProfileView('brand'); setSelectedBrand(deal.brand) }}
-                        >
-                          {deal.brand}
+                        <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontSize: '14px', color: 'var(--gray-900)' }}>
+                          {deal.dealTitle || 'Untitled Deal'}
                         </p>
                         <p
-                          style={{ margin: '0', fontSize: '13px', color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                          style={{ margin: '0 0 2px 0', fontSize: '12px', color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                          onClick={(e) => { e.stopPropagation(); setProfileView('brand'); setSelectedBrand(deal.brand) }}
+                        >
+                          Client: {deal.brand}
+                        </p>
+                        {deal.clientType && (
+                          <p style={{ margin: '0 0 2px 0', fontSize: '11px', color: 'var(--gray-600)' }}>
+                            Type: {deal.clientType}
+                          </p>
+                        )}
+                        <p
+                          style={{ margin: '0', fontSize: '12px', color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
                           onClick={(e) => { e.stopPropagation(); setProfileView('talent'); setSelectedTalent(deal.talent) }}
                         >
-                          {deal.talent || 'No talent assigned'}
+                          Talent: {deal.talent || 'No talent assigned'}
                         </p>
                       </div>
                       <input
@@ -4118,21 +4176,30 @@ function PRClientsPage({ prClients, setPrClients, user }) {
     }
 
     try {
+      const contractsWithoutFileData = (formData.contracts || []).map(contract => {
+        const { fileData, ...contractWithoutData } = contract
+        return contractWithoutData
+      })
+
+      const dataToSave = {
+        ...formData,
+        contracts: contractsWithoutFileData,
+        monthlyFee: parseFloat(formData.monthlyFee)
+      }
+
       if (editingId) {
         await updateDoc(doc(db, 'prClients', editingId), {
-          ...formData,
-          monthlyFee: parseFloat(formData.monthlyFee),
+          ...dataToSave,
           updatedAt: new Date()
         })
-        setPrClients(prClients.map(c => c.id === editingId ? { id: editingId, ...formData, monthlyFee: parseFloat(formData.monthlyFee) } : c))
+        setPrClients(prClients.map(c => c.id === editingId ? { id: editingId, ...dataToSave } : c))
       } else {
         const docRef = await addDoc(collection(db, 'prClients'), {
-          ...formData,
-          monthlyFee: parseFloat(formData.monthlyFee),
+          ...dataToSave,
           createdAt: new Date(),
           updatedAt: new Date()
         })
-        setPrClients([...prClients, { id: docRef.id, ...formData, monthlyFee: parseFloat(formData.monthlyFee) }])
+        setPrClients([...prClients, { id: docRef.id, ...dataToSave }])
       }
       setFormData({
         clientName: '',
@@ -4144,7 +4211,8 @@ function PRClientsPage({ prClients, setPrClients, user }) {
         contractStartDate: '',
         contractEndDate: '',
         autoRenewal: false,
-        contracts: []
+        contracts: [],
+        upcharges: []
       })
       setEditingId(null)
       setShowForm(false)
@@ -4521,6 +4589,63 @@ function PRClientsPage({ prClients, setPrClients, user }) {
             )}
           </div>
 
+          <div style={{ marginBottom: '16px', borderTop: '1px solid var(--gray-300)', paddingTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600' }}>Additional Charges (Upcharges)</label>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, upcharges: [...(formData.upcharges || []), { description: '', amount: 0 }] })}
+                style={{ background: 'var(--gray-300)', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+              >
+                + Add Charge
+              </button>
+            </div>
+            {formData.upcharges && formData.upcharges.length > 0 ? (
+              <div style={{ backgroundColor: 'var(--gray-50)', padding: '12px', borderRadius: '4px' }}>
+                {formData.upcharges.map((upcharge, idx) => (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '8px', marginBottom: '8px', alignItems: 'end' }}>
+                    <input
+                      type="text"
+                      value={upcharge.description}
+                      onChange={(e) => {
+                        const updated = [...formData.upcharges]
+                        updated[idx].description = e.target.value
+                        setFormData({ ...formData, upcharges: updated })
+                      }}
+                      placeholder="e.g., Press Release, Design Fee, Event Planning"
+                      style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', fontSize: '12px' }}
+                    />
+                    <input
+                      type="number"
+                      value={upcharge.amount}
+                      onChange={(e) => {
+                        const updated = [...formData.upcharges]
+                        updated[idx].amount = parseFloat(e.target.value) || 0
+                        setFormData({ ...formData, upcharges: updated })
+                      }}
+                      placeholder="0.00"
+                      style={{ padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px', fontSize: '12px' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, upcharges: formData.upcharges.filter((_, i) => i !== idx) })}
+                      style={{ background: '#dc2626', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                {formData.upcharges.length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--gray-300)', paddingTop: '8px', marginTop: '8px', fontSize: '12px', fontWeight: '600' }}>
+                    Total Upcharges: ${formatCurrencyFull(formData.upcharges.reduce((sum, uc) => sum + (uc.amount || 0), 0))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p style={{ margin: '0', fontSize: '12px', color: 'var(--gray-600)' }}>No additional charges added</p>
+            )}
+          </div>
+
           <button
             onClick={handleAddClient}
             style={{
@@ -4689,9 +4814,9 @@ function PRClientsPage({ prClients, setPrClients, user }) {
                 </p>
               </div>
               <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client</p>
+                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client (Monthly)</p>
                 <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
-                  ${prClients.length > 0 ? formatCurrencyFull((prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / prClients.length) : '0.00'}
+                  ${prClients.length > 0 ? formatCurrencyFull(prClients.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) / prClients.length) : '0.00'}
                 </p>
               </div>
             </div>
@@ -4834,8 +4959,14 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const filesWithoutDataUrl = (formData.fileAttachments || []).map(file => {
+        const { dataUrl, ...fileWithoutData } = file
+        return fileWithoutData
+      })
+
       const dataToSave = {
         ...formData,
+        fileAttachments: filesWithoutDataUrl,
         feePaidToTR: parseFloat(formData.feePaidToTR),
         feePaidToEvent: parseFloat(formData.feePaidToEvent),
         feePaidToProperty: parseFloat(formData.feePaidToProperty),
@@ -4940,6 +5071,14 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
 
   const availableDeliverables = ['Social Posts', 'Event Signage', 'Product Placement', 'Media Coverage', 'Brand Integration', 'Other']
 
+  const closedWonSponsors = sponsorships.filter(s => s.status === 'Closed Won')
+  const totalRevenue = closedWonSponsors.reduce((sum, s) => sum + (parseFloat(s.feePaidToTR) || 0), 0)
+  const totalProfit = closedWonSponsors.reduce((sum, s) => {
+    const revenue = parseFloat(s.feePaidToTR) || 0
+    const costs = (parseFloat(s.feePaidToEvent) || 0) + (parseFloat(s.feePaidToProperty) || 0) + (parseFloat(s.otherCosts) || 0)
+    return sum + (revenue - costs)
+  }, 0)
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -4947,6 +5086,19 @@ function SponsorshipsPage({ sponsorships, setSponsorships, user, contacts, onRel
         <button onClick={() => showForm ? resetForm() : setShowForm(true)} className="btn btn-primary">
           {showForm ? 'Cancel' : '+ New Sponsorship'}
         </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)' }}>TOTAL REVENUE</p>
+          <p style={{ margin: '0', fontSize: '32px', fontWeight: '700', color: 'var(--primary)' }}>${formatCurrencyFull(totalRevenue)}</p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--gray-600)' }}>{closedWonSponsors.length} closed won</p>
+        </div>
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)' }}>TOTAL PROFIT</p>
+          <p style={{ margin: '0', fontSize: '32px', fontWeight: '700', color: totalProfit >= 0 ? 'var(--success)' : '#dc2626' }}>${formatCurrencyFull(totalProfit)}</p>
+          <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--gray-600)' }}>after costs</p>
+        </div>
       </div>
 
       {showForm && (
@@ -5120,21 +5272,30 @@ function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, do
     }
 
     try {
+      const contractsWithoutFileData = (formData.contracts || []).map(contract => {
+        const { fileData, ...contractWithoutData } = contract
+        return contractWithoutData
+      })
+
+      const dataToSave = {
+        ...formData,
+        contracts: contractsWithoutFileData,
+        monthlyFee: parseFloat(formData.monthlyFee)
+      }
+
       if (editingId) {
         await updateDoc(doc(db, 'socialMediaCampaigns', editingId), {
-          ...formData,
-          monthlyFee: parseFloat(formData.monthlyFee),
+          ...dataToSave,
           updatedAt: new Date()
         })
-        setCampaigns(campaigns.map(c => c.id === editingId ? { id: editingId, ...formData, monthlyFee: parseFloat(formData.monthlyFee) } : c))
+        setCampaigns(campaigns.map(c => c.id === editingId ? { id: editingId, ...dataToSave } : c))
       } else {
         const docRef = await addDoc(collection(db, 'socialMediaCampaigns'), {
-          ...formData,
-          monthlyFee: parseFloat(formData.monthlyFee),
+          ...dataToSave,
           createdAt: new Date(),
           updatedAt: new Date()
         })
-        setCampaigns([...campaigns, { id: docRef.id, ...formData, monthlyFee: parseFloat(formData.monthlyFee) }])
+        setCampaigns([...campaigns, { id: docRef.id, ...dataToSave }])
       }
       setFormData({
         clientName: '',
@@ -5425,9 +5586,9 @@ function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, do
               </p>
             </div>
             <div style={{ padding: '16px', backgroundColor: 'var(--gray-50)', borderRadius: '6px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client</p>
+              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--gray-600)', fontWeight: '500' }}>Avg Revenue per Client (Monthly)</p>
               <p style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: 'var(--primary)' }}>
-                ${campaigns.length > 0 ? formatCurrencyFull((campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) * 12) / campaigns.length) : '0.00'}
+                ${campaigns.length > 0 ? formatCurrencyFull(campaigns.reduce((sum, c) => sum + (c.monthlyFee || 0), 0) / campaigns.length) : '0.00'}
               </p>
             </div>
           </div>
@@ -5468,6 +5629,342 @@ function SocialMediaPage({ campaigns, setCampaigns, user, contacts, onReload, do
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function MarketingServicesPage({ marketingServices, setMarketingServices, user, contacts, onReload, downloadFile }) {
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [formData, setFormData] = useState({
+    opportunityName: '',
+    status: 'Qualified Lead',
+    serviceTypes: [],
+    deliverables: [],
+    estimatedBudget: 0,
+    feeStructure: 'TBD',
+    estimatedStartDate: '',
+    estimatedEndDate: '',
+    leadOwnerEmail: user.email,
+    leadOwnerName: user.displayName || 'User',
+    notes: '',
+    fileAttachments: []
+  })
+  const fileInputRef = React.useRef(null)
+
+  const serviceTypeOptions = [
+    'Creative Design',
+    'Event Production',
+    'Paid Media Campaigns',
+    'Photo / Video Capture',
+    'Marketing Strategy & Consulting',
+    'Other'
+  ]
+
+  const deliverableOptions = [
+    'Campaign Strategy',
+    'Creative Concept Development',
+    'Graphic Design / Creative Assets',
+    'Brand Strategy / Positioning',
+    'Social / Digital Content',
+    'Paid Social / Digital Media',
+    'Media Planning & Buying',
+    'Influencer / Creator Amplification',
+    'Event Concept & Production',
+    'Event Staffing / Logistics',
+    'Photography',
+    'Videography',
+    'Content Capture',
+    'Editing / Post-Production',
+    'Marketing Consulting / Advisory',
+    'Reporting & Analytics',
+    'Other'
+  ]
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const filesWithoutDataUrl = (formData.fileAttachments || []).map(file => {
+        const { dataUrl, ...fileWithoutData } = file
+        return fileWithoutData
+      })
+
+      const dataToSave = {
+        ...formData,
+        fileAttachments: filesWithoutDataUrl,
+        estimatedBudget: parseFloat(formData.estimatedBudget),
+        serviceTypes: Array.isArray(formData.serviceTypes) ? formData.serviceTypes : [],
+        deliverables: Array.isArray(formData.deliverables) ? formData.deliverables : []
+      }
+
+      if (editingId) {
+        await updateDoc(doc(db, 'marketingServices', editingId), dataToSave)
+      } else {
+        await addDoc(collection(db, 'marketingServices'), {
+          ...dataToSave,
+          createdAt: new Date()
+        })
+      }
+      onReload()
+      resetForm()
+    } catch (error) {
+      alert('Error saving marketing service: ' + error.message)
+    }
+  }
+
+  const handleFileUpload = (e) => {
+    const files = e.target.files
+    if (!files) return
+
+    const newFiles = Array.from(files).map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      addedAt: new Date(),
+      dataUrl: null
+    }))
+
+    let processedCount = 0
+    newFiles.forEach((fileInfo, idx) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        newFiles[idx].dataUrl = event.target.result
+        processedCount++
+        if (processedCount === newFiles.length) {
+          setFormData({
+            ...formData,
+            fileAttachments: [...(formData.fileAttachments || []), ...newFiles]
+          })
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+          }
+        }
+      }
+      reader.readAsDataURL(files[idx])
+    })
+  }
+
+  const removeFile = (index) => {
+    const newFiles = formData.fileAttachments.filter((_, i) => i !== index)
+    setFormData({...formData, fileAttachments: newFiles})
+  }
+
+  const resetForm = () => {
+    setFormData({
+      opportunityName: '',
+      status: 'Qualified Lead',
+      serviceTypes: [],
+      deliverables: [],
+      estimatedBudget: 0,
+      feeStructure: 'TBD',
+      estimatedStartDate: '',
+      estimatedEndDate: '',
+      leadOwnerEmail: user.email,
+      leadOwnerName: user.displayName || 'User',
+      notes: '',
+      fileAttachments: []
+    })
+    setEditingId(null)
+    setShowForm(false)
+  }
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Delete this marketing service opportunity?')) {
+      try {
+        await deleteDoc(doc(db, 'marketingServices', id))
+        onReload()
+      } catch (error) {
+        alert('Error deleting marketing service')
+      }
+    }
+  }
+
+  const toggleServiceType = (type) => {
+    const updated = Array.isArray(formData.serviceTypes) ? [...formData.serviceTypes] : []
+    if (updated.includes(type)) {
+      updated.splice(updated.indexOf(type), 1)
+    } else {
+      updated.push(type)
+    }
+    setFormData({...formData, serviceTypes: updated})
+  }
+
+  const toggleDeliverable = (deliverable) => {
+    const updated = Array.isArray(formData.deliverables) ? [...formData.deliverables] : []
+    if (updated.includes(deliverable)) {
+      updated.splice(updated.indexOf(deliverable), 1)
+    } else {
+      updated.push(deliverable)
+    }
+    setFormData({...formData, deliverables: updated})
+  }
+
+  const openEdit = (service) => {
+    setFormData({
+      ...service,
+      serviceTypes: Array.isArray(service.serviceTypes) ? service.serviceTypes : [],
+      deliverables: Array.isArray(service.deliverables) ? service.deliverables : [],
+      fileAttachments: service.fileAttachments || []
+    })
+    setEditingId(service.id)
+    setShowForm(true)
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>Marketing Services</h1>
+        <button onClick={() => showForm ? resetForm() : setShowForm(true)} className="btn btn-primary">
+          {showForm ? 'Cancel' : '+ New Opportunity'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', padding: '20px', marginBottom: '20px' }}>
+          <h2>{editingId ? 'Edit Marketing Service' : 'New Marketing Service Opportunity'}</h2>
+          <form onSubmit={handleSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Client / Opportunity Name</label>
+                <input value={formData.opportunityName} onChange={(e) => setFormData({...formData, opportunityName: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                  {['Qualified Lead', 'Initial Outreach', 'Client Review', 'Proposal Submitted', 'Negotiation', 'Won', 'Lost'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Marketing Service Type (select all that apply)</label>
+              {serviceTypeOptions.map(type => (
+                <label key={type} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '8px' }}>
+                  <input type="checkbox" checked={Array.isArray(formData.serviceTypes) && formData.serviceTypes.includes(type)} onChange={() => toggleServiceType(type)} />
+                  {type}
+                </label>
+              ))}
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Scope / Deliverables (select all that apply)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {deliverableOptions.map(deliverable => (
+                  <label key={deliverable} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={Array.isArray(formData.deliverables) && formData.deliverables.includes(deliverable)} onChange={() => toggleDeliverable(deliverable)} />
+                    {deliverable}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div className="form-group">
+                <label>Estimated Budget ($)</label>
+                <input type="number" value={formData.estimatedBudget} onChange={(e) => setFormData({...formData, estimatedBudget: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Fee Structure</label>
+                <select value={formData.feeStructure} onChange={(e) => setFormData({...formData, feeStructure: e.target.value})}>
+                  {['Retainer', 'Project Fee', 'Commission', 'Hourly', 'TBD'].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Estimated Start Date</label>
+                <input type="date" value={formData.estimatedStartDate} onChange={(e) => setFormData({...formData, estimatedStartDate: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Estimated End Date</label>
+                <input type="date" value={formData.estimatedEndDate} onChange={(e) => setFormData({...formData, estimatedEndDate: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label>Notes</label>
+              <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} style={{ minHeight: '80px' }} />
+            </div>
+
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ marginBottom: '12px' }}>
+              Attach Files
+            </button>
+
+            {formData.fileAttachments && formData.fileAttachments.length > 0 && (
+              <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'var(--gray-50)', borderRadius: '6px' }}>
+                {formData.fileAttachments.map((file, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '6px' }}>
+                    <span>{file.name}</span>
+                    <button type="button" onClick={() => removeFile(idx)} className="btn btn-danger btn-small">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary">Save Opportunity</button>
+          </form>
+        </div>
+      )}
+
+      <div style={{ background: 'white', border: '1px solid var(--gray-300)', borderRadius: '8px', overflow: 'hidden' }}>
+        {marketingServices.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--gray-600)' }}>
+            No marketing service opportunities yet
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--gray-50)', borderBottom: '1px solid var(--gray-300)' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: 'var(--gray-600)' }}>Opportunity</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: 'var(--gray-600)' }}>Status</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: 'var(--gray-600)' }}>Services</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: 'var(--gray-600)' }}>Budget</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: 'var(--gray-600)' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {marketingServices.map(service => (
+                  <tr key={service.id} style={{ borderBottom: '1px solid var(--gray-300)', backgroundColor: 'white' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>
+                      <div style={{ fontWeight: '600' }}>{service.opportunityName}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginTop: '4px' }}>{service.leadOwnerName}</div>
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>{service.status}</td>
+                    <td style={{ padding: '12px 16px', fontSize: '12px' }}>
+                      {Array.isArray(service.serviceTypes) && service.serviceTypes.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {service.serviceTypes.map(type => (
+                            <span key={type} style={{ backgroundColor: 'var(--gray-100)', padding: '2px 6px', borderRadius: '3px', fontSize: '11px' }}>
+                              {type}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--gray-400)' }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>
+                      {service.estimatedBudget ? `$${formatCurrency(service.estimatedBudget)}` : '—'}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>
+                      <button onClick={() => openEdit(service)} className="btn btn-secondary btn-small" style={{ marginRight: '8px' }}>
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(service.id)} className="btn btn-danger btn-small">
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
