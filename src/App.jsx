@@ -1456,18 +1456,62 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
 
   // Auto-open selected deal when navigating from dashboard
   useEffect(() => {
-    if (selectedDealId) {
+    if (selectedDealId && deals.length > 0) {
       const dealToEdit = deals.find(d => d.id === selectedDealId)
-      if (dealToEdit) {
-        setFormData(dealToEdit)
+      if (dealToEdit && contacts.length > 0 && teamUsers.length > 0) {
+        // Use the same logic as the edit button click
+        setFormData({
+          ...dealToEdit,
+          dealTitle: dealToEdit.dealTitle || '',
+          dealDate: dealToEdit.dealDate || new Date().toISOString().split('T')[0],
+          clientType: dealToEdit.clientType || '',
+          talentFee: dealToEdit.talentFee || 0,
+          brokerFee: dealToEdit.brokerFee || 0,
+          sagFeeCost: dealToEdit.sagFeeCost || 0,
+          brandId: dealToEdit.brandId || '',
+          glamBuyout: dealToEdit.glamBuyout || false,
+          stylingBuyout: dealToEdit.stylingBuyout || false,
+          travelBuyout: dealToEdit.travelBuyout || false,
+          sagFee: dealToEdit.sagFee || false,
+          repForTalent: Array.isArray(dealToEdit.repForTalent) ? dealToEdit.repForTalent : (dealToEdit.repForTalent ? [dealToEdit.repForTalent] : []),
+          repForTalentIds: dealToEdit.repForTalentIds || [],
+          services: Array.isArray(dealToEdit.services) ? dealToEdit.services : [],
+          serviceDetails: dealToEdit.serviceDetails || {
+            Performance: '',
+            Appearance: '',
+            'Social Media Program': ''
+          },
+          appearanceLocation: dealToEdit.appearanceLocation || '',
+          brandReachedOutDate: dealToEdit.brandReachedOutDate || '',
+          suggestionsSharedDate: dealToEdit.suggestionsSharedDate || '',
+          offerMadeDate: dealToEdit.offerMadeDate || '',
+          contractSignedDate: dealToEdit.contractSignedDate || '',
+          servicesCompletedDate: dealToEdit.servicesCompletedDate || '',
+          paymentDate: dealToEdit.paymentDate || '',
+          agency: dealToEdit.agency || '',
+          fileAttachments: dealToEdit.fileAttachments || []
+        })
+        const contactName = dealToEdit.contactId ? contacts.find(c => c.id === dealToEdit.contactId)?.name || '' : ''
+        setContactSearch(contactName)
+        const repTalentName = dealToEdit.repForTalentId ? contacts.find(c => c.id === dealToEdit.repForTalentId)?.name || dealToEdit.repForTalent || '' : dealToEdit.repForTalent || ''
+        setRepTalentSearch(repTalentName)
+        const dealOwnerName = dealToEdit.dealOwnerName || teamUsers.find(u => u.email === dealToEdit.dealOwnerEmail)?.name || dealToEdit.dealOwnerEmail
+        setDealOwnerSearch(dealOwnerName)
+        if (Array.isArray(dealToEdit.services) && dealToEdit.services.length > 0) {
+          const expanded = {}
+          dealToEdit.services.forEach(service => {
+            expanded[service] = true
+          })
+          setExpandedServices(expanded)
+        } else {
+          setExpandedServices({})
+        }
         setEditingId(dealToEdit.id)
         setShowForm(true)
-        // Expand deal if needed
-        setExpandedDeals(prev => new Set([...prev, dealToEdit.id]))
         if (onDealOpened) onDealOpened()
       }
     }
-  }, [selectedDealId, deals, onDealOpened])
+  }, [selectedDealId, deals, contacts, teamUsers, onDealOpened])
 
   // Load team users from Firestore on mount
   useEffect(() => {
