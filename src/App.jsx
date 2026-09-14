@@ -1280,14 +1280,14 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
               <div className="metric-icon">$</div>
               <div>
                 <p className="metric-label">Total Revenue</p>
-                <p className="metric-value">${formatCurrency(totalRevenue)}</p>
+                <p className="metric-value">${formatCurrencyFull(totalRevenue)}</p>
               </div>
             </div>
             <div className="metric-card">
               <div className="metric-icon">P</div>
               <div>
                 <p className="metric-label">Total Profit</p>
-                <p className="metric-value">${formatCurrency(totalProfit)}</p>
+                <p className="metric-value">${formatCurrencyFull(totalProfit)}</p>
               </div>
             </div>
           </>
@@ -1335,8 +1335,8 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
                         <td>{metrics.deals}</td>
                         {isAdmin && (
                           <>
-                            <td>${formatCurrency(metrics.revenue)}</td>
-                            <td style={{ color: 'var(--success)', fontWeight: 'bold' }}>${formatCurrency(metrics.profit)}</td>
+                            <td>${formatCurrencyFull(metrics.revenue)}</td>
+                            <td style={{ color: 'var(--success)', fontWeight: 'bold' }}>${formatCurrencyFull(metrics.profit)}</td>
                           </>
                         )}
                       </tr>
