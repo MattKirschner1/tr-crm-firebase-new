@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, se
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 
-const ADMIN_EMAILS = ['matt@talentresources.com', 'mheller@talentresources.com']
+const ADMIN_EMAIL = 'matt@talentresources.com'
 const APP_VERSION = '2.0' // Update this to force cache refresh
 
 const DEAL_STATUSES = [
@@ -63,6 +63,7 @@ function App() {
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false, sponsorships: false, socialmedia: false, marketing: false })
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
+  const [selectedDealId, setSelectedDealId] = useState(null)
 
   useEffect(() => {
     // Check for app version updates
@@ -79,7 +80,7 @@ function App() {
       if (currentUser) {
         loadDeals()
 
-        const isAdmin = ADMIN_EMAILS.includes(currentUser.email)
+        const isAdmin = currentUser.email === ADMIN_EMAIL
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
         loadSponsorships()
@@ -244,7 +245,7 @@ function App() {
       if (deal.fileAttachments && Array.isArray(deal.fileAttachments)) {
         deal.fileAttachments.forEach(file => {
           // Only admins can export everything, others can only export their own
-          if (ADMIN_EMAILS.includes(user.email) || file.uploadedBy === user.email) {
+          if (user.email === ADMIN_EMAIL || file.uploadedBy === user.email) {
             allFiles.push({
               ...file,
               dealBrand: deal.brand,
@@ -280,7 +281,7 @@ function App() {
     return <LoginPage onLogin={setUser} />
   }
 
-  const isAdmin = ADMIN_EMAILS.includes(user.email)
+  const isAdmin = user.email === ADMIN_EMAIL
 
   const handleProfileModalSave = async (fullName) => {
     try {
@@ -482,9 +483,10 @@ function App() {
 
       <main className="main-content">
         {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} onEditDeal={(deal) => {
+          setSelectedDealId(deal.id)
           setCurrentPage('deals')
         }} />}
-        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
+        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} selectedDealId={selectedDealId} onDealOpened={() => setSelectedDealId(null)} />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="talent" />}
         {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="pr" />}
@@ -1426,7 +1428,7 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   )
 }
 
-function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile }) {
+function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile, selectedDealId, onDealOpened }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -1451,6 +1453,21 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const [dealOwnerSearch, setDealOwnerSearch] = useState('')
   const [showDealOwnerSuggestions, setShowDealOwnerSuggestions] = useState(false)
   const [teamUsers, setTeamUsers] = useState([])
+
+  // Auto-open selected deal when navigating from dashboard
+  useEffect(() => {
+    if (selectedDealId) {
+      const dealToEdit = deals.find(d => d.id === selectedDealId)
+      if (dealToEdit) {
+        setFormData(dealToEdit)
+        setEditingId(dealToEdit.id)
+        setShowForm(true)
+        // Expand deal if needed
+        setExpandedDeals(prev => new Set([...prev, dealToEdit.id]))
+        if (onDealOpened) onDealOpened()
+      }
+    }
+  }, [selectedDealId, deals, onDealOpened])
 
   // Load team users from Firestore on mount
   useEffect(() => {
@@ -3884,6 +3901,7 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
 
   // Group files by deal/item based on searchType
   let dealFilesMap = {}
+  const ADMIN_EMAIL = 'matt@talentresources.com'
 
   // Only populate based on searchType - no fallback to other divisions
   if (searchType === 'talent' && deals && deals.length > 0) {
@@ -3891,7 +3909,7 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
       if (deal.fileAttachments && deal.fileAttachments.length > 0) {
         const dealKey = deal.id
         const visibleFiles = deal.fileAttachments.filter(file => {
-          if (ADMIN_EMAILS.includes(file.uploadedBy) && !ADMIN_EMAILS.includes(user.email)) {
+          if (file.uploadedBy === ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
             return false
           }
           return true
