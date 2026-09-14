@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, se
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 
-const ADMIN_EMAIL = 'matt@talentresources.com'
+const ADMIN_EMAILS = ['matt@talentresources.com', 'mheller@talentresources.com']
 const APP_VERSION = '2.0' // Update this to force cache refresh
 
 const DEAL_STATUSES = [
@@ -63,7 +63,6 @@ function App() {
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false, sponsorships: false, socialmedia: false, marketing: false })
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
-  const [selectedDealId, setSelectedDealId] = useState(null)
 
   useEffect(() => {
     // Check for app version updates
@@ -80,7 +79,7 @@ function App() {
       if (currentUser) {
         loadDeals()
 
-        const isAdmin = currentUser.email === ADMIN_EMAIL
+        const isAdmin = ADMIN_EMAILS.includes(currentUser.email)
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
         loadSponsorships()
@@ -245,7 +244,7 @@ function App() {
       if (deal.fileAttachments && Array.isArray(deal.fileAttachments)) {
         deal.fileAttachments.forEach(file => {
           // Only admins can export everything, others can only export their own
-          if (user.email === ADMIN_EMAIL || file.uploadedBy === user.email) {
+          if (ADMIN_EMAILS.includes(user.email) || file.uploadedBy === user.email) {
             allFiles.push({
               ...file,
               dealBrand: deal.brand,
@@ -281,7 +280,7 @@ function App() {
     return <LoginPage onLogin={setUser} />
   }
 
-  const isAdmin = user.email === ADMIN_EMAIL
+  const isAdmin = ADMIN_EMAILS.includes(user.email)
 
   const handleProfileModalSave = async (fullName) => {
     try {
@@ -483,10 +482,9 @@ function App() {
 
       <main className="main-content">
         {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} onEditDeal={(deal) => {
-          setSelectedDealId(deal.id)
           setCurrentPage('deals')
         }} />}
-        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} selectedDealId={selectedDealId} onDealOpened={() => setSelectedDealId(null)} />}
+        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="talent" />}
         {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="pr" />}
@@ -1428,7 +1426,7 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   )
 }
 
-function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile, selectedDealId, onDealOpened }) {
+function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -1453,65 +1451,6 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   const [dealOwnerSearch, setDealOwnerSearch] = useState('')
   const [showDealOwnerSuggestions, setShowDealOwnerSuggestions] = useState(false)
   const [teamUsers, setTeamUsers] = useState([])
-
-  // Auto-open selected deal when navigating from dashboard
-  useEffect(() => {
-    if (selectedDealId && deals.length > 0) {
-      const dealToEdit = deals.find(d => d.id === selectedDealId)
-      if (dealToEdit && contacts.length > 0 && teamUsers.length > 0) {
-        // Use the same logic as the edit button click
-        setFormData({
-          ...dealToEdit,
-          dealTitle: dealToEdit.dealTitle || '',
-          dealDate: dealToEdit.dealDate || new Date().toISOString().split('T')[0],
-          clientType: dealToEdit.clientType || '',
-          talentFee: dealToEdit.talentFee || 0,
-          brokerFee: dealToEdit.brokerFee || 0,
-          sagFeeCost: dealToEdit.sagFeeCost || 0,
-          brandId: dealToEdit.brandId || '',
-          glamBuyout: dealToEdit.glamBuyout || false,
-          stylingBuyout: dealToEdit.stylingBuyout || false,
-          travelBuyout: dealToEdit.travelBuyout || false,
-          sagFee: dealToEdit.sagFee || false,
-          repForTalent: Array.isArray(dealToEdit.repForTalent) ? dealToEdit.repForTalent : (dealToEdit.repForTalent ? [dealToEdit.repForTalent] : []),
-          repForTalentIds: dealToEdit.repForTalentIds || [],
-          services: Array.isArray(dealToEdit.services) ? dealToEdit.services : [],
-          serviceDetails: dealToEdit.serviceDetails || {
-            Performance: '',
-            Appearance: '',
-            'Social Media Program': ''
-          },
-          appearanceLocation: dealToEdit.appearanceLocation || '',
-          brandReachedOutDate: dealToEdit.brandReachedOutDate || '',
-          suggestionsSharedDate: dealToEdit.suggestionsSharedDate || '',
-          offerMadeDate: dealToEdit.offerMadeDate || '',
-          contractSignedDate: dealToEdit.contractSignedDate || '',
-          servicesCompletedDate: dealToEdit.servicesCompletedDate || '',
-          paymentDate: dealToEdit.paymentDate || '',
-          agency: dealToEdit.agency || '',
-          fileAttachments: dealToEdit.fileAttachments || []
-        })
-        const contactName = dealToEdit.contactId ? contacts.find(c => c.id === dealToEdit.contactId)?.name || '' : ''
-        setContactSearch(contactName)
-        const repTalentName = dealToEdit.repForTalentId ? contacts.find(c => c.id === dealToEdit.repForTalentId)?.name || dealToEdit.repForTalent || '' : dealToEdit.repForTalent || ''
-        setRepTalentSearch(repTalentName)
-        const dealOwnerName = dealToEdit.dealOwnerName || teamUsers.find(u => u.email === dealToEdit.dealOwnerEmail)?.name || dealToEdit.dealOwnerEmail
-        setDealOwnerSearch(dealOwnerName)
-        if (Array.isArray(dealToEdit.services) && dealToEdit.services.length > 0) {
-          const expanded = {}
-          dealToEdit.services.forEach(service => {
-            expanded[service] = true
-          })
-          setExpandedServices(expanded)
-        } else {
-          setExpandedServices({})
-        }
-        setEditingId(dealToEdit.id)
-        setShowForm(true)
-        if (onDealOpened) onDealOpened()
-      }
-    }
-  }, [selectedDealId, deals, contacts, teamUsers, onDealOpened])
 
   // Load team users from Firestore on mount
   useEffect(() => {
@@ -3945,7 +3884,6 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
 
   // Group files by deal/item based on searchType
   let dealFilesMap = {}
-  const ADMIN_EMAIL = 'matt@talentresources.com'
 
   // Only populate based on searchType - no fallback to other divisions
   if (searchType === 'talent' && deals && deals.length > 0) {
@@ -3953,7 +3891,7 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
       if (deal.fileAttachments && deal.fileAttachments.length > 0) {
         const dealKey = deal.id
         const visibleFiles = deal.fileAttachments.filter(file => {
-          if (file.uploadedBy === ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
+          if (ADMIN_EMAILS.includes(file.uploadedBy) && !ADMIN_EMAILS.includes(user.email)) {
             return false
           }
           return true
