@@ -63,6 +63,7 @@ function App() {
   const [expandedSections, setExpandedSections] = useState({ talent: true, pr: false, sponsorships: false, socialmedia: false, marketing: false })
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
+  const [selectedDealId, setSelectedDealId] = useState(null)
 
   useEffect(() => {
     // Check for app version updates
@@ -482,9 +483,10 @@ function App() {
 
       <main className="main-content">
         {currentPage === 'dashboard' && <Dashboard deals={deals} contacts={contacts} isAdmin={isAdmin} onEditDeal={(deal) => {
+          setSelectedDealId(deal.id)
           setCurrentPage('deals')
         }} />}
-        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile}  />}
+        {currentPage === 'deals' && <DealsPage deals={deals} contacts={contacts} user={user} isAdmin={isAdmin} onReload={loadDeals} onContactAdded={() => loadContacts(user.uid, isAdmin)} downloadFile={downloadFile} selectedDealId={selectedDealId} onDealOpened={() => setSelectedDealId(null)} />}
         {currentPage === 'contacts' && <ContactsPage contacts={contacts} user={user} onReload={() => loadContacts(user.uid, isAdmin)} isAdmin={isAdmin} exportContactsAsCSV={exportContactsAsCSV} />}
         {currentPage === 'filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="talent" />}
         {currentPage === 'pr-filesearch' && <FileSearchPage deals={deals} downloadFile={downloadFile} exportDocuments={exportDocuments} user={user} prClients={prClients} searchType="pr" />}
@@ -1426,7 +1428,7 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   )
 }
 
-function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile }) {
+function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, downloadFile, selectedDealId, onDealOpened }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
@@ -1469,6 +1471,65 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
     }
     if (user) loadTeamUsers()
   }, [user])
+
+  // Auto-open deal when selectedDealId changes
+  useEffect(() => {
+    if (selectedDealId && deals.length > 0 && teamUsers.length > 0) {
+      const dealToOpen = deals.find(d => d.id === selectedDealId)
+      if (dealToOpen) {
+        // Populate form data with the deal
+        setFormData({
+          ...dealToOpen,
+          dealTitle: dealToOpen.dealTitle || '',
+          dealDate: dealToOpen.dealDate || new Date().toISOString().split('T')[0],
+          clientType: dealToOpen.clientType || '',
+          talentFee: dealToOpen.talentFee || 0,
+          brokerFee: dealToOpen.brokerFee || 0,
+          sagFeeCost: dealToOpen.sagFeeCost || 0,
+          brandId: dealToOpen.brandId || '',
+          glamBuyout: dealToOpen.glamBuyout || false,
+          stylingBuyout: dealToOpen.stylingBuyout || false,
+          travelBuyout: dealToOpen.travelBuyout || false,
+          sagFee: dealToOpen.sagFee || false,
+          repForTalent: Array.isArray(dealToOpen.repForTalent) ? dealToOpen.repForTalent : (dealToOpen.repForTalent ? [dealToOpen.repForTalent] : []),
+          repForTalentIds: dealToOpen.repForTalentIds || [],
+          services: Array.isArray(dealToOpen.services) ? dealToOpen.services : [],
+          serviceDetails: dealToOpen.serviceDetails || {
+            Performance: '',
+            Appearance: '',
+            'Social Media Program': ''
+          },
+          appearanceLocation: dealToOpen.appearanceLocation || '',
+          brandReachedOutDate: dealToOpen.brandReachedOutDate || '',
+          suggestionsSharedDate: dealToOpen.suggestionsSharedDate || '',
+          offerMadeDate: dealToOpen.offerMadeDate || '',
+          contractSignedDate: dealToOpen.contractSignedDate || '',
+          servicesCompletedDate: dealToOpen.servicesCompletedDate || '',
+          paymentDate: dealToOpen.paymentDate || '',
+          agency: dealToOpen.agency || '',
+          fileAttachments: dealToOpen.fileAttachments || []
+        })
+        const contactName = dealToOpen.contactId ? contacts.find(c => c.id === dealToOpen.contactId)?.name || '' : ''
+        setContactSearch(contactName)
+        const repTalentName = dealToOpen.repForTalentId ? contacts.find(c => c.id === dealToOpen.repForTalentId)?.name || dealToOpen.repForTalent || '' : dealToOpen.repForTalent || ''
+        setRepTalentSearch(repTalentName)
+        const dealOwnerName = dealToOpen.dealOwnerName || teamUsers.find(u => u.email === dealToOpen.dealOwnerEmail)?.name || dealToOpen.dealOwnerEmail
+        setDealOwnerSearch(dealOwnerName)
+        if (Array.isArray(dealToOpen.services) && dealToOpen.services.length > 0) {
+          const expanded = {}
+          dealToOpen.services.forEach(s => {
+            expanded[s] = false
+          })
+          setExpandedServices(expanded)
+        } else {
+          setExpandedServices({})
+        }
+        setEditingId(dealToOpen.id)
+        setShowForm(true)
+        onDealOpened()
+      }
+    }
+  }, [selectedDealId, deals, teamUsers, contacts, onDealOpened])
 
   const currentUser = teamUsers.find(m => m.email === user.email)
   const currentUserName = currentUser?.name || user.email
