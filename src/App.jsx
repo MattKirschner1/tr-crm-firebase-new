@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, se
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 
-const ADMIN_EMAIL = 'matt@talentresources.com'
+const ADMIN_EMAILS = ['matt@talentresources.com', 'mheller@talentresources.com']
 const APP_VERSION = '2.0' // Update this to force cache refresh
 
 const DEAL_STATUSES = [
@@ -79,7 +79,7 @@ function App() {
       if (currentUser) {
         loadDeals()
 
-        const isAdmin = currentUser.email === ADMIN_EMAIL
+        const isAdmin = ADMIN_EMAILS.includes(currentUser.email)
         loadContacts(currentUser.uid, isAdmin)
         loadPRClients()
         loadSponsorships()
@@ -244,7 +244,7 @@ function App() {
       if (deal.fileAttachments && Array.isArray(deal.fileAttachments)) {
         deal.fileAttachments.forEach(file => {
           // Only admins can export everything, others can only export their own
-          if (user.email === ADMIN_EMAIL || file.uploadedBy === user.email) {
+          if (ADMIN_EMAILS.includes(user.email) || file.uploadedBy === user.email) {
             allFiles.push({
               ...file,
               dealBrand: deal.brand,
@@ -280,7 +280,7 @@ function App() {
     return <LoginPage onLogin={setUser} />
   }
 
-  const isAdmin = user.email === ADMIN_EMAIL
+  const isAdmin = ADMIN_EMAILS.includes(user.email)
 
   const handleProfileModalSave = async (fullName) => {
     try {
@@ -3884,7 +3884,6 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
 
   // Group files by deal/item based on searchType
   let dealFilesMap = {}
-  const ADMIN_EMAIL = 'matt@talentresources.com'
 
   // Only populate based on searchType - no fallback to other divisions
   if (searchType === 'talent' && deals && deals.length > 0) {
@@ -3892,7 +3891,7 @@ function FileSearchPage({ deals, downloadFile, exportDocuments, user, prClients,
       if (deal.fileAttachments && deal.fileAttachments.length > 0) {
         const dealKey = deal.id
         const visibleFiles = deal.fileAttachments.filter(file => {
-          if (file.uploadedBy === ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
+          if (ADMIN_EMAILS.includes(file.uploadedBy) && !ADMIN_EMAILS.includes(user.email)) {
             return false
           }
           return true
