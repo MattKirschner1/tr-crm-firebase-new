@@ -1598,8 +1598,8 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
       const dataToSave = {
         ...formData,
         fileAttachments: filesWithUploadedBy,
-        feePaid: isAdmin ? parseFloat(formData.feePaid) : 0,
-        feeCharged: isAdmin ? parseFloat(formData.feeCharged) : 0,
+        feePaid: parseFloat(formData.feePaid),
+        feeCharged: parseFloat(formData.feeCharged),
         prCost: parseFloat(formData.prCost),
         glamCost: parseFloat(formData.glamCost),
         stylingCost: parseFloat(formData.stylingCost),
