@@ -1240,7 +1240,7 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const sortedOwners = Object.entries(ownerMetrics).sort((a, b) => b[1].deals - a[1].deals)
 
   const totalRevenue = filteredDeals.reduce((sum, d) => sum + (d.feeCharged || 0), 0)
-  const totalProfit = filteredDeals.reduce((sum, d) => sum + ((d.feeCharged || 0) - (d.feePaid || 0)), 0)
+  const totalProfit = filteredDeals.reduce((sum, d) => sum + (d.brokerFee || 0), 0)
   const closedWon = filteredDeals.filter(d => d.status === 'Closed Won').length
 
   return (
@@ -1892,7 +1892,7 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   }
 
   const netProfit = (deal) => {
-    return (deal.feeCharged || 0) - (deal.feePaid || 0)
+    return deal.brokerFee || 0
   }
 
   const getContactName = (contactId) => {
