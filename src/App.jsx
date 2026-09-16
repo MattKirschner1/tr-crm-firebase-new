@@ -1226,7 +1226,9 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
     ownerMetrics[ownerEmail].deals += 1
     if (isAdmin) {
       ownerMetrics[ownerEmail].revenue += (deal.feeCharged || 0)
-      ownerMetrics[ownerEmail].profit += ((deal.feeCharged || 0) - (deal.feePaid || 0))
+      if (deal.status === 'Closed Won') {
+        ownerMetrics[ownerEmail].profit += (deal.brokerFee || 0)
+      }
     }
   })
 
@@ -1240,7 +1242,7 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const sortedOwners = Object.entries(ownerMetrics).sort((a, b) => b[1].deals - a[1].deals)
 
   const totalRevenue = filteredDeals.reduce((sum, d) => sum + (d.feeCharged || 0), 0)
-  const totalProfit = filteredDeals.reduce((sum, d) => sum + (d.brokerFee || 0), 0)
+  const totalProfit = filteredDeals.filter(d => d.status === 'Closed Won').reduce((sum, d) => sum + (d.brokerFee || 0), 0)
   const closedWon = filteredDeals.filter(d => d.status === 'Closed Won').length
 
   return (
