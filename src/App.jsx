@@ -1227,7 +1227,9 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
     if (isAdmin) {
       ownerMetrics[ownerEmail].revenue += (deal.feeCharged || 0)
       if (deal.status === 'Closed Won') {
-        ownerMetrics[ownerEmail].profit += (deal.brokerFee || 0)
+        const brokerFee = deal.brokerFee || 0
+        const feeCharged = deal.feeCharged || 0
+        ownerMetrics[ownerEmail].profit += Math.min(brokerFee, feeCharged)
       }
     }
   })
@@ -1242,7 +1244,11 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const sortedOwners = Object.entries(ownerMetrics).sort((a, b) => b[1].deals - a[1].deals)
 
   const totalRevenue = filteredDeals.reduce((sum, d) => sum + (d.feeCharged || 0), 0)
-  const totalProfit = filteredDeals.filter(d => d.status === 'Closed Won').reduce((sum, d) => sum + (d.brokerFee || 0), 0)
+  const totalProfit = filteredDeals.filter(d => d.status === 'Closed Won').reduce((sum, d) => {
+    const brokerFee = d.brokerFee || 0
+    const feeCharged = d.feeCharged || 0
+    return sum + Math.min(brokerFee, feeCharged)
+  }, 0)
   const closedWon = filteredDeals.filter(d => d.status === 'Closed Won').length
 
   return (
@@ -1894,7 +1900,9 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
   }
 
   const netProfit = (deal) => {
-    return deal.brokerFee || 0
+    const brokerFee = deal.brokerFee || 0
+    const feeCharged = deal.feeCharged || 0
+    return Math.min(brokerFee, feeCharged)
   }
 
   const getContactName = (contactId) => {
