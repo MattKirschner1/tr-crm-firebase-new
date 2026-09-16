@@ -2304,18 +2304,16 @@ function DealsPage({ deals, contacts, user, isAdmin, onReload, onContactAdded, d
                   )}
                 </div>
 
-                {isAdmin && (
-                  <div className="form-group" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                      <label>Fee Paid to Talent ($)</label>
-                      <input type="number" value={formData.feePaid} onChange={(e) => setFormData({...formData, feePaid: e.target.value})} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label>Fee Charged to Client ($)</label>
-                      <input type="number" value={formData.feeCharged} onChange={(e) => setFormData({...formData, feeCharged: e.target.value})} style={{ width: '100%' }} />
-                    </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div>
+                    <label>Fee Paid to Talent ($)</label>
+                    <input type="number" value={formData.feePaid} onChange={(e) => setFormData({...formData, feePaid: e.target.value})} style={{ width: '100%' }} />
                   </div>
-                )}
+                  <div>
+                    <label>Fee Charged to Client ($)</label>
+                    <input type="number" value={formData.feeCharged} onChange={(e) => setFormData({...formData, feeCharged: e.target.value})} style={{ width: '100%' }} />
+                  </div>
+                </div>
 
                 <div style={{ gridColumn: '1 / -1', borderTop: '2px solid var(--gray-300)', paddingTop: '20px', marginTop: '24px' }}>
                   <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Cost Breakdown</h3>
