@@ -1244,11 +1244,29 @@ function Dashboard({ deals, contacts, isAdmin, onEditDeal }) {
   const sortedOwners = Object.entries(ownerMetrics).sort((a, b) => b[1].deals - a[1].deals)
 
   const totalRevenue = filteredDeals.reduce((sum, d) => sum + (d.feeCharged || 0), 0)
-  const totalProfit = filteredDeals.filter(d => d.status === 'Closed Won').reduce((sum, d) => {
+
+  const closedWonDeals = filteredDeals.filter(d => d.status === 'Closed Won')
+  const totalProfit = closedWonDeals.reduce((sum, d) => {
     const brokerFee = d.brokerFee || 0
     const feeCharged = d.feeCharged || 0
-    return sum + Math.min(brokerFee, feeCharged)
+    const dealProfit = Math.min(brokerFee, feeCharged)
+    return sum + dealProfit
   }, 0)
+
+  // Debug logging for profit calculation
+  if (closedWonDeals.length > 0) {
+    console.log('=== PROFIT DEBUG ===')
+    console.log(`Total Closed Won deals: ${closedWonDeals.length}`)
+    console.log(`Total Profit calculated: $${totalProfit}`)
+    closedWonDeals.forEach((d, idx) => {
+      const brokerFee = d.brokerFee || 0
+      const feeCharged = d.feeCharged || 0
+      const dealProfit = Math.min(brokerFee, feeCharged)
+      console.log(`Deal ${idx + 1}: ${d.brandName || 'No Brand'} | BF: $${brokerFee} | FC: $${feeCharged} | Profit: $${dealProfit}`)
+    })
+    console.log('===================')
+  }
+
   const closedWon = filteredDeals.filter(d => d.status === 'Closed Won').length
 
   return (
